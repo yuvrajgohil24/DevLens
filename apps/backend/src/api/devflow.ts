@@ -51,7 +51,7 @@ export async function getCommits(req: Request, res: Response) {
 export async function triggerDeploy(req: Request, res: Response) {
   try {
     const { repoId } = req.params;
-    const { branch = 'main', environment = 'staging', commit_sha } = req.body;
+    const { branch = 'main', environment = 'staging', commit_sha, commit_message } = req.body;
 
     const simulatedSha = commit_sha || Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
 
@@ -60,7 +60,7 @@ export async function triggerDeploy(req: Request, res: Response) {
     const deployment = await createDeployment({
       serviceId: service.id,
       commitSha: simulatedSha,
-      commitMessage: `Manual deploy from DevFlow UI (branch: ${branch})`,
+      commitMessage: commit_message || `Manual deploy: ${branch} → ${environment}`,
       branch,
       author: 'devflow-ui',
       status: 'running',

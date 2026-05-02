@@ -38,12 +38,16 @@ export default function DevFlowPage() {
     setLoadingCommits(false);
   };
 
-  const handleDeploy = async () => {
+  const handleDeploy = async (commitMsg?: string) => {
     setDeploying(true);
     setDeployResult(null);
     setDeployStatus('Triggering deployment…');
     try {
-      const r = await api.devflow.deploy(selectedRepo, { branch: selectedBranch, environment: selectedEnv });
+      const r = await api.devflow.deploy(selectedRepo, { 
+        branch: selectedBranch, 
+        environment: selectedEnv,
+        commit_message: commitMsg
+      });
       setDeployResult({ id: r.deployment_id, sha: r.commit_sha, msg: r.message });
       setDeployStatus('Deployment created! Scan enqueued…');
 
@@ -126,7 +130,7 @@ export default function DevFlowPage() {
           </div>
 
           <button
-            onClick={handleDeploy}
+            onClick={() => handleDeploy()}
             disabled={deploying}
             style={{
               display:'flex', alignItems:'center', gap:8,
@@ -234,7 +238,7 @@ export default function DevFlowPage() {
                   </div>
                 </div>
                 <button
-                  onClick={async ()=>{ setSelectedBranch(c.sha); await handleDeploy(); }}
+                  onClick={async ()=>{ setSelectedBranch(c.sha); await handleDeploy(c.message); }}
                   style={{
                     flexShrink:0, display:'flex', alignItems:'center', gap:4,
                     background:'rgba(129,140,248,0.1)', color:'var(--primary)',

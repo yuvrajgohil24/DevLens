@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { RiskScoreBadge } from '@/components/ui/RiskScoreBadge';
 import {
   Rocket, ShieldAlert, AlertTriangle, TrendingUp,
-  Server, Activity, RefreshCw, GitCommit,
+  Server, Activity, RefreshCw, GitCommit, Key,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -20,32 +20,34 @@ function StatCard({ title, value, sub, icon: Icon, color }: {
   icon: React.ElementType; color: string;
 }) {
   return (
-    <div className="glass-card" style={{ padding: '24px', position: 'relative', overflow: 'hidden', minHeight: 160 }}>
-      {/* Decorative Faint Icon */}
-      <div style={{ position: 'absolute', top: 10, right: 10, opacity: 0.05, color: '#fff' }}>
-        <Icon size={64} strokeWidth={1} />
+    <div className="glass-card" style={{ 
+      padding: '20px', position: 'relative', overflow: 'hidden', 
+      minHeight: 130, flex: '1 1 200px', maxWidth: 'calc(20% - 13px)',
+      minWidth: '220px'
+    }}>
+      <div style={{ position: 'absolute', top: 12, right: 12, opacity: 0.1, color: '#fff' }}>
+        <Icon size={32} strokeWidth={1.5} />
       </div>
       
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
-        <div>
-          <span style={{ 
-            fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, 
-            textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: 'var(--font-mono)' 
-          }}>
-            {title}
-          </span>
-          <div style={{ 
-            fontSize: '3.5rem', fontWeight: 800, color: 'var(--text-primary)', 
-            lineHeight: 1, marginTop: 8, fontFamily: 'var(--font-heading)',
-            letterSpacing: '-0.03em'
-          }}>
-            {value}
-          </div>
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ 
+          fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 600, 
+          textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-mono)',
+          marginBottom: 14
+        }}>
+          {title}
+        </div>
+        <div style={{ 
+          fontSize: '2.2rem', fontWeight: 600, color: 'var(--text-primary)', 
+          lineHeight: 1, fontFamily: 'var(--font-mono)', // Using Mono for values to be precise
+          letterSpacing: '-0.02em', marginBottom: 14
+        }}>
+          {value}
         </div>
         {sub && (
           <div style={{ 
-            fontSize: '0.65rem', color: color, fontWeight: 500, 
-            fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em' 
+            fontSize: '0.6rem', color: color, fontWeight: 500, 
+            fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.04em' 
           }}>
             {sub}
           </div>
@@ -84,9 +86,9 @@ export default function DashboardPage() {
   ].filter(d => d.value > 0) : [];
 
   if (loading) return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-      {Array.from({length:4}).map((_,i) => (
-        <div key={i} className="glass-card skeleton" style={{ height: 110 }} />
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+      {Array.from({length:5}).map((_,i) => (
+        <div key={i} className="glass-card skeleton" style={{ height: 130, flex: '1 1 200px', maxWidth: 'calc(20% - 13px)', minWidth: '220px' }} />
       ))}
     </div>
   );
@@ -111,15 +113,16 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
         <StatCard title="Total Deployments" value={data?.totalDeployments ?? 0} sub={`${data?.activeDeployments ?? 0} active`} icon={Rocket} color="var(--primary)" />
         <StatCard title="Open CVEs" value={data?.openCVEs ?? 0} sub={`${data?.criticalCVEs ?? 0} critical`} icon={ShieldAlert} color="var(--critical)" />
+        <StatCard title="Secret Leaks" value={data?.detectedSecrets ?? 0} sub="in git history" icon={Key} color="#ec4899" />
         <StatCard title="Policy Violations" value={data?.openViolations ?? 0} sub="unresolved" icon={AlertTriangle} color="var(--warning)" />
         <StatCard title="Avg Risk Score" value={data?.avgRiskScore ?? '—'} sub={`across ${data?.servicesCount ?? 0} services`} icon={TrendingUp} color="var(--accent)" />
       </div>
 
       {/* Middle row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
         {/* Recent deployments */}
         <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -147,7 +150,7 @@ export default function DashboardPage() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {dep.service?.name ?? 'unknown'}
+                        {dep.commitMessage ?? dep.service?.name ?? 'unknown'}
                       </div>
                     </div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: 100 }}>

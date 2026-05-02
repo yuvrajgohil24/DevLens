@@ -12,6 +12,7 @@ export async function getOverview(_req: Request, res: Response) {
       servicesCount,
       latestRiskScores,
       recentDeployments,
+      detectedSecrets,
     ] = await Promise.all([
       prisma.deployment.count(),
       prisma.deployment.count({ where: { status: { in: ['running', 'pending'] } } }),
@@ -33,6 +34,7 @@ export async function getOverview(_req: Request, res: Response) {
           _count: { select: { vulnerabilities: true } },
         },
       }),
+      prisma.secret.count(),
     ]);
 
     const avgRiskScore =
@@ -45,6 +47,7 @@ export async function getOverview(_req: Request, res: Response) {
       activeDeployments,
       openCVEs,
       criticalCVEs,
+      detectedSecrets,
       openViolations,
       servicesCount,
       avgRiskScore: Math.round(avgRiskScore * 10) / 10,

@@ -41,3 +41,9 @@ coverage/
 
 # Misc
 .turbo/
+
+# Binaries
+apps/backend/bin/
+bin/
+*.exe
+*.tar.gz

@@ -41,7 +41,7 @@ export async function insertVulnerabilities(
     cveId?: string;
     title: string;
     severity?: string;
-    cvssScore?: number;
+    cvssScore?: number | any;
     affectedPackage?: string;
     fixedVersion?: string | null;
     scannerSource?: string;
@@ -50,3 +50,22 @@ export async function insertVulnerabilities(
   if (vulnerabilities.length === 0) return;
   return prisma.vulnerability.createMany({ data: vulnerabilities });
 }
+
+export async function insertSecrets(
+  secrets: Array<{
+    scanId: string;
+    deploymentId: string;
+    serviceId: string;
+    type: string;
+    source: string;
+    file?: string | null;
+    line?: number | null;
+    commitSha?: string | null;
+    rawFinding?: any;
+    isVerified?: boolean;
+  }>
+) {
+  if (secrets.length === 0) return;
+  return prisma.secret.createMany({ data: secrets });
+}
+

@@ -102,8 +102,8 @@ export default function DeploymentsPage() {
                   <tr key={dep.id} style={{ cursor:'pointer' }}
                     onClick={() => window.location.href = `/deployments/${dep.id}`}>
                     <td>
-                      <div style={{ fontWeight:600, fontSize:'0.85rem' }}>{dep.service?.name}</div>
-                      <div style={{ fontSize:'0.72rem', color:'var(--text-muted)' }}>{dep.service?.language}</div>
+                      <div style={{ fontWeight:600, fontSize:'0.85rem', color: 'var(--text-primary)' }}>{dep.commitMessage ?? dep.service?.name}</div>
+                      <div style={{ fontSize:'0.72rem', color:'var(--text-muted)' }}>{dep.service?.name} • {dep.service?.language}</div>
                     </td>
                     <td>
                       <div style={{ display:'flex', alignItems:'center', gap:5 }}>

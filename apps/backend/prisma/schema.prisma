@@ -19,6 +19,7 @@ model Service {
 
   deployments      Deployment[]
   vulnerabilities  Vulnerability[]
+  secrets          Secret[]
   riskScores       RiskScore[]
   policyViolations PolicyViolation[]
 
@@ -41,6 +42,7 @@ model Deployment {
   service          Service           @relation(fields: [serviceId], references: [id])
   scans            Scan[]
   vulnerabilities  Vulnerability[]
+  secrets          Secret[]
   riskScores       RiskScore[]
   policyViolations PolicyViolation[]
 
@@ -58,6 +60,7 @@ model Scan {
 
   deployment      Deployment      @relation(fields: [deploymentId], references: [id])
   vulnerabilities Vulnerability[]
+  secrets         Secret[]
 
   @@map("scans")
 }
@@ -115,4 +118,25 @@ model PolicyViolation {
   service    Service    @relation(fields: [serviceId], references: [id])
 
   @@map("policy_violations")
+}
+
+model Secret {
+  id              String   @id @default(uuid())
+  scanId          String   @map("scan_id")
+  deploymentId    String   @map("deployment_id")
+  serviceId       String   @map("service_id")
+  type            String   @db.VarChar(100) // e.g. AWS Key, GitHub Token
+  source          String   @db.VarChar(50)  // e.g. git, filesystem
+  file            String?  @db.VarChar(500)
+  line            Int?
+  commitSha       String?  @map("commit_sha") @db.VarChar(40)
+  rawFinding      Json?    @map("raw_finding")
+  isVerified      Boolean  @default(false) @map("is_verified")
+  detectedAt      DateTime @default(now()) @map("detected_at")
+
+  scan       Scan       @relation(fields: [scanId], references: [id])
+  deployment Deployment @relation(fields: [deploymentId], references: [id])
+  service    Service    @relation(fields: [serviceId], references: [id])
+
+  @@map("secrets")
 }

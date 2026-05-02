@@ -59,7 +59,7 @@ export const api = {
     branches: (repoId: string) => apiFetch<{ data: Branch[]; repo: string }>(`/api/devflow/repos/${repoId}/branches`),
     commits: (repoId: string, branch?: string) =>
       apiFetch<{ data: Commit[] }>(`/api/devflow/repos/${repoId}/commits${branch ? `?branch=${branch}` : ''}`),
-    deploy: (repoId: string, body: { branch: string; environment: string }) =>
+    deploy: (repoId: string, body: { branch: string; environment: string; commit_message?: string }) =>
       apiFetch<{ success: boolean; deployment_id: string; commit_sha: string; message: string }>(
         `/api/devflow/repos/${repoId}/deploy`,
         { method: 'POST', body: JSON.stringify(body) }
@@ -74,6 +74,7 @@ export interface DashboardOverview {
   activeDeployments: number;
   openCVEs: number;
   criticalCVEs: number;
+  detectedSecrets: number;
   openViolations: number;
   servicesCount: number;
   avgRiskScore: number;
@@ -140,6 +141,19 @@ export interface PolicyViolation {
   severity: string | null;
   detail: string | null;
   isResolved: boolean;
+  detectedAt: string;
+  service?: { id: string; name: string };
+  deployment?: { id: string; commitSha: string; branch: string | null };
+}
+
+export interface Secret {
+  id: string;
+  type: string;
+  source: string;
+  file: string | null;
+  line: number | null;
+  commitSha: string | null;
+  isVerified: boolean;
   detectedAt: string;
   service?: { id: string; name: string };
   deployment?: { id: string; commitSha: string; branch: string | null };

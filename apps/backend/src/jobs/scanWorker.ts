@@ -1,11 +1,13 @@
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { runTrivy, parseTrivyOutput } from '../scanners/trivy';
-import { createScan, completeScan, failScan, insertVulnerabilities } from '../services/scanService';
+import { runTruffleHog, parseTruffleHogOutput } from '../scanners/truffleHog';
+import { createScan, completeScan, failScan, insertVulnerabilities, insertSecrets } from '../services/scanService';
 import { calculateRiskScore } from '../services/riskScoreService';
 import { updateDeploymentStatus } from '../services/deploymentService';
 import { wsEvents } from '../websocket/index';
 import { cloneRepository, cleanupDirectory } from '../utils/git';
+import prisma from '../db/prisma';
 import path from 'path';
 import os from 'os';
 
@@ -28,8 +30,9 @@ const worker = new Worker<ScanJobData>(
     const { deployment_id, service_id, service_name, image_name, repo_url } = job.data;
     console.log(`\n🔬 Starting scan job [${job.id}] for ${image_name}`);
 
-    // 1. Create scan record
-    const scan = await createScan(deployment_id, 'trivy');
+    // 1. Create scan records
+    const trivyScan = await createScan(deployment_id, 'trivy');
+    const truffleScan = await createScan(deployment_id, 'trufflehog');
 
     try {
       // 2. Update deployment to running
@@ -38,83 +41,81 @@ const worker = new Worker<ScanJobData>(
       let scanTargetPath = '';
       let isTemp = false;
 
-      // 3. Clone repository if URL is provided, otherwise scan local (for development)
+      // 3. Clone repository if URL is provided
       if (repo_url) {
         const tempDirName = `devlens-scan-${deployment_id.slice(0, 8)}-${Date.now()}`;
         scanTargetPath = path.join(os.tmpdir(), tempDirName);
         isTemp = true;
         await cloneRepository(repo_url, scanTargetPath);
       } else {
-         // Fallback to project root if no repo_url (useful for testing)
          scanTargetPath = path.resolve(__dirname, '../../../../');
       }
 
-      // 4. Run Trivy (Now Real Docker Scan)
-      let rawOutput: any;
       try {
-        rawOutput = await runTrivy(scanTargetPath);
-      } finally {
-        // Cleanup ASAP
-        if (isTemp) {
-          await cleanupDirectory(scanTargetPath);
+        // 4. RUN ALL SCANNERS
+        console.log(`📡 [WORKER] Orchestrating Scans for ${service_name}...`);
+        
+        // --- TRIVY (CVEs) ---
+        const trivyOutput = await runTrivy(scanTargetPath);
+        const parsedVulns = parseTrivyOutput(trivyOutput);
+        await insertVulnerabilities(
+          parsedVulns.map(v => ({ ...v, scanId: trivyScan.id, deploymentId: deployment_id, serviceId: service_id }))
+        );
+        await completeScan(trivyScan.id, trivyOutput);
+
+        // --- TRUFFLEHOG (Secrets) ---
+        const truffleOutput = await runTruffleHog(scanTargetPath);
+        const parsedSecrets = parseTruffleHogOutput(truffleOutput);
+        await insertSecrets(
+          parsedSecrets.map(s => ({ ...s, scanId: truffleScan.id, deploymentId: deployment_id, serviceId: service_id }))
+        );
+        await completeScan(truffleScan.id, truffleOutput);
+
+        // --- 5. POLICY ENGINE (Guardrails) ---
+        console.log(`⚖️ [POLICY] Evaluating results...`);
+        const criticalCveCount = parsedVulns.filter(v => v.severity === 'critical').length;
+        const secretCount = parsedSecrets.length;
+
+        // Rule: FAIL on Critical CVEs OR ANY Secrets (User request)
+        let finalStatus = 'success';
+        let failureReason = '';
+
+        if (criticalCveCount > 0) {
+          finalStatus = 'failed';
+          failureReason = `Deployment blocked: ${criticalCveCount} Critical CVEs detected.`;
+        } else if (secretCount > 0) {
+          finalStatus = 'failed';
+          failureReason = `Deployment blocked: ${secretCount} Leaked Secrets detected in history.`;
         }
-      }
 
-      // 5. Parse + normalize CVEs
-      const parsedVulns = parseTrivyOutput(rawOutput);
-      console.log(`   Found ${parsedVulns.length} vulnerabilities`);
+        // 6. Calculate Risk Score
+        const riskScore = await calculateRiskScore(deployment_id, service_id);
 
-      // 5. Bulk insert vulnerabilities
-      await insertVulnerabilities(
-        parsedVulns.map((v) => ({
-          scanId: scan.id,
+        // 7. Update final Deployment status
+        await updateDeploymentStatus(deployment_id, finalStatus, new Date());
+
+        // 8. Emit Events
+        wsEvents.scanCompleted({
           deploymentId: deployment_id,
           serviceId: service_id,
-          cveId: v.cveId,
-          title: v.title,
-          severity: v.severity,
-          cvssScore: v.cvssScore,
-          affectedPackage: v.affectedPackage,
-          fixedVersion: v.fixedVersion,
-          scannerSource: v.scannerSource,
-        }))
-      );
-
-      // 6. Mark scan complete
-      await completeScan(scan.id, rawOutput);
-
-      // 7. Calculate risk score
-      const riskScore = await calculateRiskScore(deployment_id, service_id);
-
-      // 8. Update deployment to success
-      await updateDeploymentStatus(deployment_id, 'success', new Date());
-
-      // 9. Emit WebSocket events
-      const criticalCount = parsedVulns.filter((v) => v.severity === 'critical').length;
-
-      wsEvents.scanCompleted({
-        deploymentId: deployment_id,
-        serviceId: service_id,
-        criticalCount,
-        riskScore: Number(riskScore.score),
-      });
-
-      // Alert on critical CVEs
-      if (criticalCount > 0) {
-        const criticalCve = parsedVulns.find((v) => v.severity === 'critical')!;
-        wsEvents.criticalCveDetected({
-          deploymentId: deployment_id,
-          serviceName: service_name,
-          cveId: criticalCve.cveId,
-          title: criticalCve.title,
+          criticalCount: criticalCveCount + secretCount, // Combined critical issues
+          riskScore: Number(riskScore.score),
         });
-      }
 
-      console.log(`✅ Scan complete for ${image_name} | Risk: ${riskScore.score} | CVEs: ${parsedVulns.length}`);
+        if (finalStatus === 'failed') {
+          console.warn(`🛑 [POLICY FAIL] ${failureReason}`);
+        } else {
+          console.log(`✅ [POLICY PASS] Deployment successful for ${service_name}`);
+        }
+
+      } finally {
+        if (isTemp) await cleanupDirectory(scanTargetPath);
+      }
     } catch (err) {
-      await failScan(scan.id, String(err));
+      await failScan(trivyScan.id, String(err));
+      await failScan(truffleScan.id, String(err));
       await updateDeploymentStatus(deployment_id, 'failed', new Date());
-      throw err; // BullMQ will retry
+      throw err;
     }
   },
   {
