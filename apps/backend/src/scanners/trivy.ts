@@ -112,16 +112,7 @@ const CVE_POOL: NormalizedVulnerability[] = [
 ];
 
 export async function runTrivy(targetPath: string): Promise<unknown> {
-  const isWindows = process.platform === 'win32';
-  
-  // Normalize path for Docker volume mounting (especially on Windows)
-  let normalizedPath = targetPath;
-  if (isWindows) {
-    // Convert D:\path\to\repo to /d/path/to/repo for Docker
-    normalizedPath = targetPath.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
-  }
-
-  const command = `docker run --rm -v "${normalizedPath}:/tmp/scan" aquasec/trivy fs --format json /tmp/scan`;
+  const command = `trivy fs --format json "${targetPath}"`;
   
   console.log(`🔍 [TRIVY] Running real scan: ${command}`);
   
