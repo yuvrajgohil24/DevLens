@@ -5,12 +5,17 @@ import { createScan, completeScan, failScan, insertVulnerabilities } from '../se
 import { calculateRiskScore } from '../services/riskScoreService';
 import { updateDeploymentStatus } from '../services/deploymentService';
 import { wsEvents } from '../websocket/index';
+import { cloneRepository, cleanupDirectory } from '../utils/git';
+import path from 'path';
+import os from 'os';
+
 
 interface ScanJobData {
   deployment_id: string;
   service_id: string;
   service_name: string;
   image_name: string;
+  repo_url?: string;
 }
 
 const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
@@ -20,7 +25,7 @@ const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379'
 const worker = new Worker<ScanJobData>(
   'scan-queue',
   async (job: Job<ScanJobData>) => {
-    const { deployment_id, service_id, service_name, image_name } = job.data;
+    const { deployment_id, service_id, service_name, image_name, repo_url } = job.data;
     console.log(`\n🔬 Starting scan job [${job.id}] for ${image_name}`);
 
     // 1. Create scan record
@@ -30,10 +35,32 @@ const worker = new Worker<ScanJobData>(
       // 2. Update deployment to running
       await updateDeploymentStatus(deployment_id, 'running');
 
-      // 3. Run Trivy (mock in Phase 1)
-      const rawOutput = await runTrivy(image_name);
+      let scanTargetPath = '';
+      let isTemp = false;
 
-      // 4. Parse + normalize CVEs
+      // 3. Clone repository if URL is provided, otherwise scan local (for development)
+      if (repo_url) {
+        const tempDirName = `devlens-scan-${deployment_id.slice(0, 8)}-${Date.now()}`;
+        scanTargetPath = path.join(os.tmpdir(), tempDirName);
+        isTemp = true;
+        await cloneRepository(repo_url, scanTargetPath);
+      } else {
+         // Fallback to project root if no repo_url (useful for testing)
+         scanTargetPath = path.resolve(__dirname, '../../../../');
+      }
+
+      // 4. Run Trivy (Now Real Docker Scan)
+      let rawOutput: any;
+      try {
+        rawOutput = await runTrivy(scanTargetPath);
+      } finally {
+        // Cleanup ASAP
+        if (isTemp) {
+          await cleanupDirectory(scanTargetPath);
+        }
+      }
+
+      // 5. Parse + normalize CVEs
       const parsedVulns = parseTrivyOutput(rawOutput);
       console.log(`   Found ${parsedVulns.length} vulnerabilities`);
 

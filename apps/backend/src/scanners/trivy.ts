@@ -1,4 +1,10 @@
-// Phase 1: Realistic mock Trivy scanner
+// Phase 2: Real Trivy scanner using Docker
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import path from 'path';
+
+const execAsync = promisify(exec);
+
 // Phase 2: Replace runTrivy() with real child_process exec of trivy CLI
 
 export interface NormalizedVulnerability {
@@ -105,32 +111,32 @@ const CVE_POOL: NormalizedVulnerability[] = [
   },
 ];
 
-export async function runTrivy(imageName: string): Promise<unknown> {
-  // Phase 1: Simulate scan delay then return mock JSON
-  console.log(`🔍 [MOCK TRIVY] Scanning image: ${imageName}`);
-  await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000));
+export async function runTrivy(targetPath: string): Promise<unknown> {
+  const isWindows = process.platform === 'win32';
+  
+  // Normalize path for Docker volume mounting (especially on Windows)
+  let normalizedPath = targetPath;
+  if (isWindows) {
+    // Convert D:\path\to\repo to /d/path/to/repo for Docker
+    normalizedPath = targetPath.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
+  }
 
-  return {
-    SchemaVersion: 2,
-    ArtifactName: imageName,
-    ArtifactType: 'container_image',
-    Results: [
-      {
-        Target: `${imageName} (alpine 3.18.6)`,
-        Class: 'os-pkgs',
-        Type: 'alpine',
-        Vulnerabilities: CVE_POOL.map((v) => ({
-          VulnerabilityID: v.cveId,
-          PkgName: v.affectedPackage?.split('@')[0],
-          InstalledVersion: v.affectedPackage?.split('@')[1],
-          FixedVersion: v.fixedVersion,
-          Severity: v.severity.toUpperCase(),
-          Title: v.title,
-          CVSS: { nvd: { V3Score: v.cvssScore } },
-        })),
-      },
-    ],
-  };
+  const command = `docker run --rm -v "${normalizedPath}:/tmp/scan" aquasec/trivy fs --format json /tmp/scan`;
+  
+  console.log(`🔍 [TRIVY] Running real scan: ${command}`);
+  
+  try {
+    const { stdout, stderr } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10 }); // 10MB buffer
+    
+    if (stderr && !stdout) {
+      console.warn(`⚠️ [TRIVY] Warnings: ${stderr}`);
+    }
+
+    return JSON.parse(stdout);
+  } catch (err) {
+    console.error(`❌ [TRIVY] Scan failed:`, err);
+    throw new Error('Trivy scan execution failed');
+  }
 }
 
 export function parseTrivyOutput(rawOutput: unknown): NormalizedVulnerability[] {
