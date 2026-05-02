@@ -1,0 +1,73 @@
+name: DevLens CI — Self Monitoring
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  build-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Notify DevLens — Deployment Started
+        run: |
+          curl -s -X POST ${{ secrets.DEVLENS_WEBHOOK_URL }}/api/webhooks/pipeline \
+            -H "Content-Type: application/json" \
+            -d '{
+              "commit_sha":      "${{ github.sha }}",
+              "service_name":    "devlens",
+              "branch":          "${{ github.ref_name }}",
+              "author":          "${{ github.actor }}",
+              "status":          "running",
+              "environment":     "production",
+              "commit_message":  "${{ github.event.head_commit.message }}",
+              "pipeline_url":    "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "language":        "Node.js",
+              "repo_url":        "https://github.com/${{ github.repository }}"
+            }'
+
+      - name: Install Dependencies
+        run: npm ci
+        working-directory: apps/backend
+
+      - name: Type Check
+        run: npx tsc --noEmit
+        working-directory: apps/backend
+
+      - name: Notify DevLens — Build Success
+        if: success()
+        run: |
+          curl -s -X POST ${{ secrets.DEVLENS_WEBHOOK_URL }}/api/webhooks/pipeline \
+            -H "Content-Type: application/json" \
+            -d '{
+              "commit_sha": "${{ github.sha }}",
+              "service_name": "devlens",
+              "branch": "${{ github.ref_name }}",
+              "author": "${{ github.actor }}",
+              "status": "success",
+              "environment": "production",
+              "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
+
+      - name: Notify DevLens — Build Failed
+        if: failure()
+        run: |
+          curl -s -X POST ${{ secrets.DEVLENS_WEBHOOK_URL }}/api/webhooks/pipeline \
+            -H "Content-Type: application/json" \
+            -d '{
+              "commit_sha": "${{ github.sha }}",
+              "service_name": "devlens",
+              "branch": "${{ github.ref_name }}",
+              "author": "${{ github.actor }}",
+              "status": "failed",
+              "environment": "production",
+              "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'

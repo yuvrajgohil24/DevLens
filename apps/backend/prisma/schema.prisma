@@ -1,0 +1,118 @@
+// This is your Prisma schema file
+// Canonical schema for DevLens — DO NOT modify field names without updating all services
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Service {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(100)
+  repoUrl   String?  @map("repo_url")
+  language  String?  @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  deployments      Deployment[]
+  vulnerabilities  Vulnerability[]
+  riskScores       RiskScore[]
+  policyViolations PolicyViolation[]
+
+  @@map("services")
+}
+
+model Deployment {
+  id            String    @id @default(uuid())
+  serviceId     String    @map("service_id")
+  commitSha     String    @map("commit_sha") @db.VarChar(40)
+  commitMessage String?   @map("commit_message")
+  branch        String?   @db.VarChar(100)
+  author        String?   @db.VarChar(100)
+  status        String    @db.VarChar(20) // pending | running | success | failed
+  environment   String?   @db.VarChar(20) // staging | production
+  triggeredAt   DateTime  @default(now()) @map("triggered_at")
+  completedAt   DateTime? @map("completed_at")
+  pipelineUrl   String?   @map("pipeline_url")
+
+  service          Service           @relation(fields: [serviceId], references: [id])
+  scans            Scan[]
+  vulnerabilities  Vulnerability[]
+  riskScores       RiskScore[]
+  policyViolations PolicyViolation[]
+
+  @@map("deployments")
+}
+
+model Scan {
+  id           String    @id @default(uuid())
+  deploymentId String    @map("deployment_id")
+  scannerType  String?   @map("scanner_type") @db.VarChar(50) // trivy | snyk | trufflehog | sast
+  status       String    @db.VarChar(20) // queued | running | completed | failed
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  rawOutput    Json?     @map("raw_output")
+
+  deployment      Deployment      @relation(fields: [deploymentId], references: [id])
+  vulnerabilities Vulnerability[]
+
+  @@map("scans")
+}
+
+model Vulnerability {
+  id              String   @id @default(uuid())
+  scanId          String   @map("scan_id")
+  deploymentId    String   @map("deployment_id")
+  serviceId       String   @map("service_id")
+  cveId           String?  @map("cve_id") @db.VarChar(50)
+  title           String
+  severity        String?  @db.VarChar(20) // critical | high | medium | low
+  cvssScore       Decimal? @map("cvss_score") @db.Decimal(3, 1)
+  affectedPackage String?  @map("affected_package") @db.VarChar(200)
+  fixedVersion    String?  @map("fixed_version") @db.VarChar(100)
+  scannerSource   String?  @map("scanner_source") @db.VarChar(50)
+  isResolved      Boolean  @default(false) @map("is_resolved")
+  detectedAt      DateTime @default(now()) @map("detected_at")
+
+  scan       Scan       @relation(fields: [scanId], references: [id])
+  deployment Deployment @relation(fields: [deploymentId], references: [id])
+  service    Service    @relation(fields: [serviceId], references: [id])
+
+  @@map("vulnerabilities")
+}
+
+model RiskScore {
+  id            String   @id @default(uuid())
+  serviceId     String   @map("service_id")
+  deploymentId  String   @map("deployment_id")
+  score         Decimal  @db.Decimal(4, 1)
+  criticalCount Int      @default(0) @map("critical_count")
+  highCount     Int      @default(0) @map("high_count")
+  mediumCount   Int      @default(0) @map("medium_count")
+  lowCount      Int      @default(0) @map("low_count")
+  calculatedAt  DateTime @default(now()) @map("calculated_at")
+
+  service    Service    @relation(fields: [serviceId], references: [id])
+  deployment Deployment @relation(fields: [deploymentId], references: [id])
+
+  @@map("risk_scores")
+}
+
+model PolicyViolation {
+  id            String   @id @default(uuid())
+  deploymentId  String   @map("deployment_id")
+  serviceId     String   @map("service_id")
+  violationType String?  @map("violation_type") @db.VarChar(100) // secret_detected | unsigned_image | unscanned_dep
+  severity      String?  @db.VarChar(20)
+  detail        String?
+  detectedAt    DateTime @default(now()) @map("detected_at")
+  isResolved    Boolean  @default(false) @map("is_resolved")
+
+  deployment Deployment @relation(fields: [deploymentId], references: [id])
+  service    Service    @relation(fields: [serviceId], references: [id])
+
+  @@map("policy_violations")
+}
