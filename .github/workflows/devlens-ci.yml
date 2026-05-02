@@ -38,11 +38,12 @@ jobs:
 
       - name: Install Dependencies
         run: npm ci
-        working-directory: apps/backend
+
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema=apps/backend/prisma/schema.prisma
 
       - name: Type Check
-        run: npx tsc --noEmit
-        working-directory: apps/backend
+        run: npx tsc --noEmit -p apps/backend/tsconfig.json
 
       - name: Notify DevLens — Build Success
         if: success() && secrets.DEVLENS_WEBHOOK_URL != ''
