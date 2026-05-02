@@ -13,33 +13,44 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-const SEV_COLORS = ['#f87171','#fb923c','#fbbf24','#4ade80'];
+const SEV_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e'];
 
-function StatCard({ title, value, sub, icon: Icon, color, glow }: {
+function StatCard({ title, value, sub, icon: Icon, color }: {
   title: string; value: string | number; sub?: string;
-  icon: React.ElementType; color: string; glow?: boolean;
+  icon: React.ElementType; color: string;
 }) {
   return (
-    <div className="glass-card" style={{ padding: '20px 24px', position: 'relative', overflow: 'hidden' }}>
-      <div style={{
-        position: 'absolute', top: -20, right: -15,
-        width: 80, height: 80, borderRadius: '50%',
-        background: `${color}18`, filter: 'blur(18px)',
-      }} />
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</span>
-        <div style={{
-          width: 32, height: 32, borderRadius: 8,
-          background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          ...(glow ? { boxShadow: `0 0 12px ${color}40` } : {}),
-        }}>
-          <Icon size={15} color={color} />
+    <div className="glass-card" style={{ padding: '24px', position: 'relative', overflow: 'hidden', minHeight: 160 }}>
+      {/* Decorative Faint Icon */}
+      <div style={{ position: 'absolute', top: 10, right: 10, opacity: 0.05, color: '#fff' }}>
+        <Icon size={64} strokeWidth={1} />
+      </div>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+        <div>
+          <span style={{ 
+            fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, 
+            textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: 'var(--font-mono)' 
+          }}>
+            {title}
+          </span>
+          <div style={{ 
+            fontSize: '3.5rem', fontWeight: 800, color: 'var(--text-primary)', 
+            lineHeight: 1, marginTop: 8, fontFamily: 'var(--font-heading)',
+            letterSpacing: '-0.03em'
+          }}>
+            {value}
+          </div>
         </div>
+        {sub && (
+          <div style={{ 
+            fontSize: '0.65rem', color: color, fontWeight: 500, 
+            fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em' 
+          }}>
+            {sub}
+          </div>
+        )}
       </div>
-      <div style={{ fontSize: '2rem', fontWeight: 700, color: glow ? color : 'var(--text-primary)', lineHeight: 1, marginBottom: 6 }} className="count-up font-mono">
-        {value}
-      </div>
-      {sub && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{sub}</div>}
     </div>
   );
 }
@@ -101,10 +112,10 @@ export default function DashboardPage() {
 
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-        <StatCard title="Total Deployments" value={data?.totalDeployments ?? 0} sub={`${data?.activeDeployments ?? 0} active`} icon={Rocket} color="#818cf8" />
-        <StatCard title="Open CVEs" value={data?.openCVEs ?? 0} sub={`${data?.criticalCVEs ?? 0} critical`} icon={ShieldAlert} color="#f87171" glow={(data?.criticalCVEs ?? 0) > 0} />
-        <StatCard title="Policy Violations" value={data?.openViolations ?? 0} sub="unresolved" icon={AlertTriangle} color="#fbbf24" glow={(data?.openViolations ?? 0) > 0} />
-        <StatCard title="Avg Risk Score" value={data?.avgRiskScore ?? '—'} sub={`across ${data?.servicesCount ?? 0} services`} icon={TrendingUp} color="#22d3ee" />
+        <StatCard title="Total Deployments" value={data?.totalDeployments ?? 0} sub={`${data?.activeDeployments ?? 0} active`} icon={Rocket} color="var(--primary)" />
+        <StatCard title="Open CVEs" value={data?.openCVEs ?? 0} sub={`${data?.criticalCVEs ?? 0} critical`} icon={ShieldAlert} color="var(--critical)" />
+        <StatCard title="Policy Violations" value={data?.openViolations ?? 0} sub="unresolved" icon={AlertTriangle} color="var(--warning)" />
+        <StatCard title="Avg Risk Score" value={data?.avgRiskScore ?? '—'} sub={`across ${data?.servicesCount ?? 0} services`} icon={TrendingUp} color="var(--accent)" />
       </div>
 
       {/* Middle row */}
@@ -119,36 +130,35 @@ export default function DashboardPage() {
             <Link href="/deployments" style={{ fontSize: '0.75rem', color: 'var(--primary)', textDecoration: 'none' }}>View all →</Link>
           </div>
           <div>
-            {(data?.recentDeployments ?? []).map((dep: Deployment) => {
+            {(data?.recentDeployments ?? []).map((dep: Deployment, idx: number) => {
               const risk = dep.riskScores?.[0]?.score;
               return (
-                <Link key={dep.id} href={`/deployments/${dep.id}`} style={{ textDecoration: 'none' }}>
+                <Link key={`${dep.id}-${idx}`} href={`/deployments/${dep.id}`} style={{ textDecoration: 'none' }}>
                   <div style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 20px', borderBottom: '1px solid var(--border)',
-                    transition: 'background 0.15s', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 16,
+                    padding: '8px 20px', borderBottom: '1px solid var(--border)',
+                    transition: 'background 0.1s', cursor: 'pointer',
                   }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--card-hover)'}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                   >
-                    <div style={{
-                      width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-                      background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <GitCommit size={15} color="var(--text-muted)" />
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: 60 }}>
+                      {dep.commitSha.slice(0,7)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {dep.service?.name ?? 'unknown'}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                        {dep.commitSha.slice(0,7)} · {dep.branch}
-                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: 100 }}>
+                      /{dep.branch}
+                    </div>
+                    <div style={{ width: 100, display: 'flex', justifyContent: 'center' }}>
+                      <StatusBadge status={dep.status} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                      <StatusBadge status={dep.status} />
                       {risk !== undefined && <RiskScoreBadge score={Number(risk)} size="sm" />}
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
                         {formatDistanceToNow(new Date(dep.triggeredAt), { addSuffix: true })}
                       </span>
                     </div>
@@ -173,11 +183,11 @@ export default function DashboardPage() {
           {sevData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={sevData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
-                  {sevData.map((_, idx) => <Cell key={idx} fill={SEV_COLORS[idx % SEV_COLORS.length]} strokeWidth={0} />)}
+                <Pie data={sevData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} stroke="none" dataKey="value">
+                  {sevData.map((_, idx) => <Cell key={idx} fill={SEV_COLORS[idx % SEV_COLORS.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, fontSize:'0.8rem' }} />
-                <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{v}</span>} />
+                <Tooltip contentStyle={{ background:'#000', border:'1px solid var(--border)', borderRadius:0, fontSize:'0.7rem', fontFamily: 'var(--font-mono)' }} />
+                <Legend iconType="rect" iconSize={6} formatter={(v) => <span style={{ color: 'var(--text-secondary)', fontSize: '0.65rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{v}</span>} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -202,10 +212,10 @@ export default function DashboardPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 1, padding: 1 }}>
           {(data?.recentDeployments ?? [])
             .filter((d,i,a) => a.findIndex(x => x.service?.id === d.service?.id) === i)
-            .map(dep => {
+            .map((dep, idx) => {
               const risk = dep.riskScores?.[0]?.score ?? 0;
               return (
-                <Link key={dep.service?.id} href={`/services/${dep.service?.id}`} style={{ textDecoration: 'none' }}>
+                <Link key={`${dep.service?.id}-${idx}`} href={`/services/${dep.service?.id}`} style={{ textDecoration: 'none' }}>
                   <div style={{
                     padding: '16px', background: 'var(--surface)',
                     transition: 'background 0.15s', cursor: 'pointer',

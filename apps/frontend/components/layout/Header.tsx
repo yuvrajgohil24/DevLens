@@ -21,19 +21,18 @@ export function Header() {
 
   return (
     <header style={{
-      height: 60,
+      height: 54,
       borderBottom: '1px solid var(--border)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       padding: '0 32px',
-      background: 'rgba(7,7,17,0.8)',
-      backdropFilter: 'blur(12px)',
+      background: 'var(--background)',
       position: 'sticky',
       top: 0,
       zIndex: 40,
     }}>
-      <h1 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+      <h1 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
         {title}
       </h1>
 

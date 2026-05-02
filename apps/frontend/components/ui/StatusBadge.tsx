@@ -3,11 +3,11 @@
 interface StatusBadgeProps { status: string; }
 
 const STATUS_MAP: Record<string, { color: string; bg: string; border: string; dot: string }> = {
-  success:   { color: 'var(--success)',  bg: 'var(--success-bg)',  border: 'rgba(52,211,153,0.3)',  dot: 'var(--success)' },
-  failed:    { color: 'var(--critical)', bg: 'var(--critical-bg)', border: 'rgba(248,113,113,0.3)', dot: 'var(--critical)' },
-  running:   { color: 'var(--primary)',  bg: 'var(--primary-glow)', border: 'rgba(129,140,248,0.3)', dot: 'var(--primary)' },
-  pending:   { color: 'var(--medium)',   bg: 'var(--medium-bg)',   border: 'rgba(251,191,36,0.3)',  dot: 'var(--medium)' },
-  completed: { color: 'var(--success)',  bg: 'var(--success-bg)',  border: 'rgba(52,211,153,0.3)',  dot: 'var(--success)' },
+  success:   { color: 'var(--success)',  bg: 'var(--success-bg)',  border: 'rgba(16,185,129,0.3)',  dot: 'var(--success)' },
+  failed:    { color: 'var(--critical)', bg: 'var(--critical-bg)', border: 'rgba(239,68,68,0.3)', dot: 'var(--critical)' },
+  running:   { color: 'var(--primary)',  bg: 'var(--primary-glow)', border: 'rgba(59,130,246,0.3)', dot: 'var(--primary)' },
+  pending:   { color: 'var(--medium)',   bg: 'var(--medium-bg)',   border: 'rgba(234,179,8,0.3)',  dot: 'var(--medium)' },
+  completed: { color: 'var(--success)',  bg: 'var(--success-bg)',  border: 'rgba(16,185,129,0.3)',  dot: 'var(--success)' },
   queued:    { color: 'var(--text-secondary)', bg: 'rgba(255,255,255,0.06)', border: 'var(--border)', dot: 'var(--text-muted)' },
 };
 
@@ -17,15 +17,16 @@ export function StatusBadge({ status }: StatusBadgeProps) {
 
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
-      borderRadius: 999, padding: '3px 9px',
-      fontSize: '0.72rem', fontWeight: 600, textTransform: 'capitalize',
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      background: 'transparent', color: cfg.color, border: `1px solid ${cfg.color}50`,
+      borderRadius: 2, padding: '2px 8px',
+      fontSize: '0.7rem', fontWeight: 500, textTransform: 'uppercase',
+      fontFamily: 'var(--font-mono)',
       whiteSpace: 'nowrap',
+      letterSpacing: '0.05em',
     }}>
       <span
-        className={isPulsing ? 'pulse-dot' : ''}
-        style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }}
+        style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }}
       />
       {status}
     </span>
@@ -46,9 +47,11 @@ export function SeverityBadge({ severity }: SeverityBadgeProps) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
-      background: cfg.bg, color: cfg.color,
-      borderRadius: 4, padding: '2px 8px',
-      fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+      background: 'transparent', color: cfg.color,
+      border: `1px solid ${cfg.color}50`,
+      borderRadius: 2, padding: '1px 6px',
+      fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em',
+      fontFamily: 'var(--font-mono)',
     }}>
       {severity}
     </span>

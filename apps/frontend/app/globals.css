@@ -3,51 +3,55 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #070711;
-  --surface: #0d0d1a;
-  --surface-2: #131320;
-  --card: rgba(255, 255, 255, 0.03);
-  --card-hover: rgba(255, 255, 255, 0.055);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --background: #000000;
+  --surface: #09090b; /* zinc-950 */
+  --surface-2: #18181b; /* zinc-900 */
+  --card: #09090b;
+  --card-hover: #18181b;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.2);
 
-  --primary: #818cf8;
-  --primary-glow: rgba(129, 140, 248, 0.25);
-  --accent: #22d3ee;
-  --accent-glow: rgba(34, 211, 238, 0.2);
+  --primary: #3b82f6; /* crisp vibrant blue */
+  --primary-glow: rgba(59, 130, 246, 0.15);
+  --accent: #2563eb;
+  --accent-glow: rgba(37, 99, 235, 0.1);
 
-  --critical: #f87171;
-  --critical-bg: rgba(248, 113, 113, 0.12);
-  --high: #fb923c;
-  --high-bg: rgba(251, 146, 60, 0.12);
-  --medium: #fbbf24;
-  --medium-bg: rgba(251, 191, 36, 0.12);
-  --low: #4ade80;
-  --low-bg: rgba(74, 222, 128, 0.12);
+  --critical: #ef4444; /* stark red */
+  --critical-bg: rgba(239, 68, 68, 0.1);
+  --high: #f97316;
+  --high-bg: rgba(249, 115, 22, 0.1);
+  --medium: #eab308;
+  --medium-bg: rgba(234, 179, 8, 0.1);
+  --low: #22c55e;
+  --low-bg: rgba(34, 197, 94, 0.1);
 
-  --success: #34d399;
-  --success-bg: rgba(52, 211, 153, 0.12);
-  --warning: #fbbf24;
-  --danger: #f87171;
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --warning: #f59e0b;
+  --danger: #ef4444;
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa; /* zinc-400 */
+  --text-muted: #71717a; /* zinc-500 */
 
-  --sidebar-width: 240px;
-  --radius: 10px;
+  --sidebar-width: 200px; /* Slimmer sidebar */
+  --radius: 4px; /* Even sharper corners */
+
+  /* Font Aliases */
+  --font-heading: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
 
   /* shadcn tokens */
-  --foreground: 248 250 252;
-  --muted: 15 23 42;
-  --muted-foreground: 148 163 184;
-  --popover: 13 13 26;
-  --popover-foreground: 248 250 252;
-  --card-foreground: 248 250 252;
+  --foreground: 255 255 255;
+  --muted: 24 24 27;
+  --muted-foreground: 161 161 170;
+  --popover: 9 9 11;
+  --popover-foreground: 255 255 255;
+  --card-foreground: 255 255 255;
   --destructive: 239 68 68;
-  --destructive-foreground: 248 250 252;
-  --ring: 129 140 248;
-  --input: rgba(255,255,255,0.08);
+  --destructive-foreground: 255 255 255;
+  --ring: 59 130 246;
+  --input: rgba(255,255,255,0.1);
 }
 
 * {
@@ -60,7 +64,7 @@ html, body {
   height: 100%;
   background-color: var(--background);
   color: var(--text-primary);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-mono); /* Default to mono for labels/meta */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -71,23 +75,26 @@ html, body {
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-/* ── Glass card ─────────────────────────────────────────── */
+/* ── Layout Overrides ───────────────────────────────────── */
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ── Precise Card ─────────────────────────────────────────── */
 .glass-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  backdrop-filter: blur(12px);
-  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.15s ease;
 }
 .glass-card:hover {
-  background: var(--card-hover);
   border-color: var(--border-strong);
 }
 
-/* ── Glow effects ───────────────────────────────────────── */
-.glow-primary { box-shadow: 0 0 20px var(--primary-glow); }
-.glow-accent  { box-shadow: 0 0 20px var(--accent-glow); }
-.glow-critical { box-shadow: 0 0 20px rgba(248,113,113,0.2); }
+/* ── Toned Down Elements ───────────────────────────────────────── */
+.glow-primary, .glow-accent, .glow-critical { box-shadow: none; } /* Kill glows */
 
 /* ── Gradient text ──────────────────────────────────────── */
 .gradient-text {
@@ -141,7 +148,7 @@ html, body {
 .sidebar {
   width: var(--sidebar-width);
   flex-shrink: 0;
-  background: var(--surface);
+  background: var(--background); /* Pure black sidebar */
   border-right: 1px solid var(--border);
   position: fixed;
   top: 0;

@@ -6,10 +6,10 @@ interface RiskScoreBadgeProps {
 }
 
 function getColor(score: number) {
-  if (score >= 8) return { color: 'var(--critical)', bg: 'var(--critical-bg)', border: 'rgba(248,113,113,0.3)' };
-  if (score >= 6) return { color: 'var(--high)',     bg: 'var(--high-bg)',     border: 'rgba(251,146,60,0.3)' };
-  if (score >= 4) return { color: 'var(--medium)',   bg: 'var(--medium-bg)',   border: 'rgba(251,191,36,0.3)' };
-  return             { color: 'var(--low)',      bg: 'var(--low-bg)',      border: 'rgba(74,222,128,0.3)' };
+  if (score >= 8) return { color: 'var(--critical)', bg: 'var(--critical-bg)', border: 'rgba(239,68,68,0.3)' };
+  if (score >= 6) return { color: 'var(--high)',     bg: 'var(--high-bg)',     border: 'rgba(249,115,22,0.3)' };
+  if (score >= 4) return { color: 'var(--medium)',   bg: 'var(--medium-bg)',   border: 'rgba(234,179,8,0.3)' };
+  return             { color: 'var(--low)',      bg: 'var(--low-bg)',      border: 'rgba(34,197,94,0.3)' };
 }
 
 function getLabel(score: number) {
@@ -29,11 +29,13 @@ export function RiskScoreBadge({ score, size = 'md' }: RiskScoreBadgeProps) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
-      background: bg, color, border: `1px solid ${border}`,
-      borderRadius: 999, padding: paddings[size],
-      fontSize: fontSizes[size], fontWeight: 700,
-      fontFamily: 'var(--font-mono, monospace)',
+      background: bg, color, border: `1px solid ${color}40`,
+      borderRadius: 2, padding: paddings[size],
+      fontSize: fontSizes[size], fontWeight: 500,
+      fontFamily: 'var(--font-mono)',
       whiteSpace: 'nowrap',
+      textTransform: 'uppercase',
+      letterSpacing: '0.02em',
     }}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
       {s} · {getLabel(score)}
