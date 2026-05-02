@@ -8,6 +8,8 @@ on:
 jobs:
   build-and-notify:
     runs-on: ubuntu-latest
+    env:
+      WEBHOOK_URL: ${{ secrets.DEVLENS_WEBHOOK_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,10 +20,10 @@ jobs:
           node-version: '20'
 
       - name: Notify DevLens — Deployment Started
-        if: secrets.DEVLENS_WEBHOOK_URL != ''
+        if: env.WEBHOOK_URL != ''
         continue-on-error: true
         run: |
-          curl -s -X POST ${{ secrets.DEVLENS_WEBHOOK_URL }}/api/webhooks/pipeline \
+          curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
             -d '{
               "commit_sha":      "${{ github.sha }}",
@@ -46,10 +48,10 @@ jobs:
         run: npx tsc --noEmit -p apps/backend/tsconfig.json
 
       - name: Notify DevLens — Build Success
-        if: success() && secrets.DEVLENS_WEBHOOK_URL != ''
+        if: success() && env.WEBHOOK_URL != ''
         continue-on-error: true
         run: |
-          curl -s -X POST ${{ secrets.DEVLENS_WEBHOOK_URL }}/api/webhooks/pipeline \
+          curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
             -d '{
               "commit_sha": "${{ github.sha }}",
@@ -62,10 +64,10 @@ jobs:
             }'
 
       - name: Notify DevLens — Build Failed
-        if: failure() && secrets.DEVLENS_WEBHOOK_URL != ''
+        if: failure() && env.WEBHOOK_URL != ''
         continue-on-error: true
         run: |
-          curl -s -X POST ${{ secrets.DEVLENS_WEBHOOK_URL }}/api/webhooks/pipeline \
+          curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
             -d '{
               "commit_sha": "${{ github.sha }}",
