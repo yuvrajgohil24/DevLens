@@ -18,6 +18,8 @@ jobs:
           node-version: '20'
 
       - name: Notify DevLens — Deployment Started
+        if: secrets.DEVLENS_WEBHOOK_URL != ''
+        continue-on-error: true
         run: |
           curl -s -X POST ${{ secrets.DEVLENS_WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
@@ -43,7 +45,8 @@ jobs:
         working-directory: apps/backend
 
       - name: Notify DevLens — Build Success
-        if: success()
+        if: success() && secrets.DEVLENS_WEBHOOK_URL != ''
+        continue-on-error: true
         run: |
           curl -s -X POST ${{ secrets.DEVLENS_WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
@@ -58,7 +61,8 @@ jobs:
             }'
 
       - name: Notify DevLens — Build Failed
-        if: failure()
+        if: failure() && secrets.DEVLENS_WEBHOOK_URL != ''
+        continue-on-error: true
         run: |
           curl -s -X POST ${{ secrets.DEVLENS_WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
