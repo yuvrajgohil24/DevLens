@@ -116,8 +116,16 @@ const worker = new Worker<ScanJobData>(
           });
         } else {
           console.log(`✅ [POLICY PASS] Deployment successful for ${service_name}`);
-          // Optionally send success alert
-          // await sendSlackAlert({ title: `✅ Scan Passed: ${service_name}`, message: 'No critical issues found.', level: 'info' });
+          await sendSlackAlert({
+            title: `✅ Security Scan Passed: ${service_name}`,
+            message: `Deployment verified. No critical vulnerabilities or leaked secrets detected.`,
+            level: 'info',
+            details: {
+              'Deployment ID': deployment_id,
+              'Risk Score': riskScore.score.toString(),
+              'Total CVEs': parsedVulns.length.toString()
+            }
+          });
         }
 
       } finally {
