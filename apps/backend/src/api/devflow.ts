@@ -4,47 +4,63 @@ import { scanQueue } from '../db/redis';
 import { getOrCreateService } from '../services/serviceService';
 import { createDeployment } from '../services/deploymentService';
 import { wsEvents } from '../websocket/index';
+import {
+  getRepoBranches as ghGetBranches,
+  getRepoCommits as ghGetCommits,
+  getOwnerRepos,
+  resolveRepo,
+} from '../services/githubService';
+
+// GET /api/devflow/repos
+export async function getRepos(_req: Request, res: Response) {
+  try {
+    if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_OWNER) {
+      return res.status(503).json({ error: 'GitHub credentials not configured. Set GITHUB_TOKEN and GITHUB_OWNER in .env' });
+    }
+    const repos = await getOwnerRepos();
+    return res.json({ data: repos });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ [DevFlow] getRepos failed:', msg);
+    return res.status(500).json({ error: msg });
+  }
+}
 
 // GET /api/devflow/repos/:repoId/branches
 export async function getBranches(req: Request, res: Response) {
-  // Phase 1: Return simulated branch data
   const { repoId } = req.params;
-  return res.json({
-    data: [
-      { name: 'main', sha: 'a1b2c3d4e5f6', isDefault: true, updatedAt: new Date().toISOString() },
-      { name: 'develop', sha: 'b2c3d4e5f6a1', isDefault: false, updatedAt: new Date(Date.now() - 3600000).toISOString() },
-      { name: 'feature/auth-refresh', sha: 'c3d4e5f6a1b2', isDefault: false, updatedAt: new Date(Date.now() - 7200000).toISOString() },
-      { name: 'fix/payment-race', sha: 'd4e5f6a1b2c3', isDefault: false, updatedAt: new Date(Date.now() - 86400000).toISOString() },
-    ],
-    repo: repoId,
-  });
+  if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_OWNER) {
+    return res.status(503).json({ error: 'GitHub credentials not configured.' });
+  }
+  try {
+    const repoName = resolveRepo(repoId);
+    console.log(`🌿 [DevFlow] Fetching real branches for ${process.env.GITHUB_OWNER}/${repoName}`);
+    const branches = await ghGetBranches(repoName);
+    return res.json({ data: branches, repo: repoId, source: 'github' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ [DevFlow] getBranches failed:', msg);
+    return res.status(500).json({ error: msg });
+  }
 }
 
 // GET /api/devflow/repos/:repoId/commits
 export async function getCommits(req: Request, res: Response) {
   const { repoId } = req.params;
   const { branch = 'main' } = req.query;
-
-  const commits = Array.from({ length: 10 }, (_, i) => ({
-    sha: Math.random().toString(16).slice(2, 10),
-    message: [
-      'feat: add JWT refresh token rotation',
-      'fix: resolve race condition in payment processor',
-      'chore: update dependencies to latest',
-      'feat: implement rate limiting middleware',
-      'fix: correct CORS headers for mobile clients',
-      'refactor: extract auth service to separate module',
-      'feat: add request tracing with correlation IDs',
-      'fix: handle null pointer in user lookup',
-      'chore: add health check endpoint',
-      'feat: implement circuit breaker pattern',
-    ][i],
-    author: ['yuvraj.singh', 'alice.dev', 'bob.ops', 'carol.infra'][i % 4],
-    date: new Date(Date.now() - i * 3600000 * 6).toISOString(),
-    branch,
-  }));
-
-  return res.json({ data: commits, repo: repoId, branch });
+  if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_OWNER) {
+    return res.status(503).json({ error: 'GitHub credentials not configured.' });
+  }
+  try {
+    const repoName = resolveRepo(repoId);
+    console.log(`📝 [DevFlow] Fetching real commits for ${process.env.GITHUB_OWNER}/${repoName}@${branch}`);
+    const commits = await ghGetCommits(repoName, String(branch));
+    return res.json({ data: commits, repo: repoId, branch, source: 'github' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ [DevFlow] getCommits failed:', msg);
+    return res.status(500).json({ error: msg });
+  }
 }
 
 // POST /api/devflow/repos/:repoId/deploy
@@ -53,38 +69,44 @@ export async function triggerDeploy(req: Request, res: Response) {
     const { repoId } = req.params;
     const { branch = 'main', environment = 'staging', commit_sha, commit_message } = req.body;
 
-    const simulatedSha = commit_sha || Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
+    const repoName = resolveRepo(repoId);
+    const owner = process.env.GITHUB_OWNER || 'unknown';
 
-    // Create the service + deployment records (same as webhook)
-    const service = await getOrCreateService(repoId);
+    // Use provided SHA (from real commit list) or generate one for manual deploys
+    const finalSha = commit_sha || Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
+
+    const service = await getOrCreateService(repoId, `https://github.com/${owner}/${repoName}`);
     const deployment = await createDeployment({
       serviceId: service.id,
-      commitSha: simulatedSha,
+      commitSha: finalSha,
       commitMessage: commit_message || `Manual deploy: ${branch} → ${environment}`,
       branch,
       author: 'devflow-ui',
       status: 'running',
       environment,
-      pipelineUrl: `https://github.com/placeholder/actions/runs/simulated`,
+      pipelineUrl: `https://github.com/${owner}/${repoName}/commit/${finalSha}`,
     });
 
-    // Enqueue scan
+    // Enqueue security scan
     await scanQueue.add('trivy-scan', {
       deployment_id: deployment.id,
       service_id: service.id,
       service_name: repoId,
-      image_name: `${repoId}:${simulatedSha.slice(0, 7)}`,
+      image_name: `${repoName}:${finalSha.slice(0, 7)}`,
     });
 
     try {
       wsEvents.deploymentCreated({ deploymentId: deployment.id, serviceName: service.name, status: 'running' });
     } catch { /* non-fatal */ }
 
+    console.log(`🚀 [DevFlow] Deploy triggered: ${owner}/${repoName}@${branch} (${finalSha.slice(0, 7)}) → ${environment}`);
+
     return res.status(201).json({
       success: true,
       deployment_id: deployment.id,
-      commit_sha: simulatedSha,
+      commit_sha: finalSha,
       message: `Deployment triggered for ${repoId}@${branch} → ${environment}`,
+      github_url: `https://github.com/${owner}/${repoName}/commit/${finalSha}`,
     });
   } catch (err) {
     console.error('Deploy trigger error:', err);
@@ -112,5 +134,56 @@ export async function getDeploymentStatus(req: Request, res: Response) {
   } catch (err) {
     console.error('Deployment status error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// ── Local Git Operations ──────────────────────────────────────────────────
+
+import { getGitStatus, gitFetch, gitPull, gitPush } from '../services/gitService';
+
+// GET /api/devflow/repos/:repoId/git/status
+export async function getLocalGitStatus(req: Request, res: Response) {
+  try {
+    const { repoId } = req.params;
+    const repoName = resolveRepo(repoId);
+    
+    const status = await getGitStatus(repoName);
+    return res.json({ success: true, data: status });
+  } catch (err: any) {
+    console.error(`❌ [DevFlow] Git status error for ${req.params.repoId}:`, err.message);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+// POST /api/devflow/repos/:repoId/git/action
+export async function executeGitAction(req: Request, res: Response) {
+  try {
+    const { repoId } = req.params;
+    const { action } = req.body;
+    const repoName = resolveRepo(repoId);
+
+    let result;
+    switch (action) {
+      case 'fetch':
+        result = await gitFetch(repoName);
+        break;
+      case 'pull':
+        result = await gitPull(repoName);
+        break;
+      case 'push':
+        result = await gitPush(repoName);
+        break;
+      default:
+        return res.status(400).json({ error: 'Invalid git action. Must be fetch, pull, or push.' });
+    }
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Git command failed', output: result.output });
+    }
+
+    return res.json({ success: true, message: `Git ${action} successful`, output: result.output });
+  } catch (err: any) {
+    console.error(`❌ [DevFlow] Git action error:`, err.message);
+    return res.status(500).json({ error: err.message });
   }
 }

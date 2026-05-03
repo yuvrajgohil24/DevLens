@@ -21,16 +21,16 @@ export async function runTruffleHog(repoPath: string): Promise<string> {
   // Use the absolute path to our newly installed TruffleHog
   const truffleHogBin = path.resolve(process.cwd(), 'bin', 'trufflehog.exe');
   
-  // We normalize the Windows path format so TruffleHog's git parser accepts it as a valid URI
-  const normalizedPath = repoPath.replace(/\\/g, '/');
-  const command = `"${truffleHogBin}" git "file:///${normalizedPath}" --json --no-update`;
+  // We bypass Windows URI parsing issues by setting the execution directory
+  // and scanning the current relative directory representing the git repository.
+  const command = `"${truffleHogBin}" git "file://." --json --no-update`;
   
-  console.log(`🔍 [TRUFFLEHOG] Scanning full git history: ${command}`);
+  console.log(`🔍 [TRUFFLEHOG] Scanning full git history: ${command} in ${repoPath}`);
   
   try {
     // TruffleHog returns results in stdout, but if no secrets found, it might return exit code 0 or 1 depending on version.
     // Usually, it emits findings to stdout.
-    const { stdout, stderr } = await execAsync(command, { maxBuffer: 1024 * 1024 * 20 }); // 20MB buffer
+    const { stdout, stderr } = await execAsync(command, { maxBuffer: 1024 * 1024 * 20, cwd: repoPath }); // 20MB buffer
     
     return stdout;
   } catch (err: any) {

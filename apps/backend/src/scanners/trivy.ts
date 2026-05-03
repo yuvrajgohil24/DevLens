@@ -114,7 +114,8 @@ const CVE_POOL: NormalizedVulnerability[] = [
 export async function runTrivy(targetPath: string): Promise<unknown> {
   // Use absolute path to ensure it works across different terminal environments
   const trivyBin = String.raw`C:\Users\YUVRAJ SINGH\AppData\Local\Microsoft\WinGet\Packages\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe\trivy.exe`;
-  const command = `"${trivyBin}" fs --format json "${targetPath}"`;
+  const skipDirs = `--skip-dirs "**/node_modules" --skip-dirs "**/.next" --skip-dirs "**/dist" --skip-dirs "**/.git" --skip-files "**/.next/**/*"`;
+  const command = `"${trivyBin}" fs --format json ${skipDirs} "${targetPath}"`;
   
   console.log(`🔍 [TRIVY] Running real scan: ${command}`);
   

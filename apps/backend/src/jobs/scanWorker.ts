@@ -10,8 +10,7 @@ import { cloneRepository, cleanupDirectory } from '../utils/git';
 import prisma from '../db/prisma';
 import path from 'path';
 import os from 'os';
-
-
+import { sendSlackAlert } from '../services/slackService';
 interface ScanJobData {
   deployment_id: string;
   service_id: string;
@@ -104,8 +103,21 @@ const worker = new Worker<ScanJobData>(
 
         if (finalStatus === 'failed') {
           console.warn(`🛑 [POLICY FAIL] ${failureReason}`);
+          await sendSlackAlert({
+            title: `🚨 Security Alert: ${service_name}`,
+            message: failureReason,
+            level: 'critical',
+            details: {
+              'Deployment ID': deployment_id,
+              'Risk Score': riskScore.score.toString(),
+              'Critical CVEs': criticalCveCount.toString(),
+              'Exposed Secrets': secretCount.toString(),
+            }
+          });
         } else {
           console.log(`✅ [POLICY PASS] Deployment successful for ${service_name}`);
+          // Optionally send success alert
+          // await sendSlackAlert({ title: `✅ Scan Passed: ${service_name}`, message: 'No critical issues found.', level: 'info' });
         }
 
       } finally {
