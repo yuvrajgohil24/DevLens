@@ -47,3 +47,8 @@ apps/backend/bin/
 bin/
 *.exe
 *.tar.gz
+
+# Local documentation and logs
+PROJECT_OVERVIEW.md
+apps/frontend/build_log*.txt
+

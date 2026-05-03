@@ -123,10 +123,26 @@ const worker = new Worker<ScanJobData>(
       } finally {
         if (isTemp) await cleanupDirectory(scanTargetPath);
       }
-    } catch (err) {
+    } catch (err: any) {
       await failScan(trivyScan.id, String(err));
       await failScan(truffleScan.id, String(err));
       await updateDeploymentStatus(deployment_id, 'failed', new Date());
+
+      // Notify Slack about system failure
+      try {
+        await sendSlackAlert({
+          title: `❌ Scanner System Error: ${service_name}`,
+          message: `Security pipeline failed to execute: ${err.message || 'Unknown error during scan execution.'}`,
+          level: 'critical',
+          details: {
+            'Deployment ID': deployment_id,
+            'Job ID': job.id || 'unknown'
+          }
+        });
+      } catch (slackErr) {
+        console.error('Failed to send error alert to Slack:', slackErr);
+      }
+
       throw err;
     }
   },

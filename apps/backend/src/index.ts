@@ -37,7 +37,7 @@ async function bootstrap() {
   initializeWebSocket(httpServer);
 
   // 5. Start listening
-  httpServer.listen(PORT, () => {
+  httpServer.listen(PORT, async () => {
     console.log(`\n🚀 DevLens Backend running at http://localhost:${PORT}`);
     console.log(`📡 WebSocket available at ws://localhost:${PORT}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/health\n`);

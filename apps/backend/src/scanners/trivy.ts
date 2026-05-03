@@ -112,10 +112,8 @@ const CVE_POOL: NormalizedVulnerability[] = [
 ];
 
 export async function runTrivy(targetPath: string): Promise<unknown> {
-  // Use absolute path to ensure it works across different terminal environments
-  const trivyBin = String.raw`C:\Users\YUVRAJ SINGH\AppData\Local\Microsoft\WinGet\Packages\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe\trivy.exe`;
-  const skipDirs = `--skip-dirs "**/node_modules" --skip-dirs "**/.next" --skip-dirs "**/dist" --skip-dirs "**/.git" --skip-files "**/.next/**/*"`;
-  const command = `"${trivyBin}" fs --format json ${skipDirs} "${targetPath}"`;
+  const trivyPath = String.raw`C:\Users\YUVRAJ SINGH\AppData\Local\Microsoft\WinGet\Packages\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe\trivy.exe`;
+  const command = `"${trivyPath}" fs --format json --scanners vuln --skip-dirs "**/node_modules" --skip-dirs "**/.next" --skip-dirs "**/dist" --skip-dirs "**/.git" --skip-dirs "**/pkg" --skip-dirs "**/tmp" "${path.resolve(targetPath)}"`;
   
   console.log(`🔍 [TRIVY] Running real scan: ${command}`);
   
@@ -127,9 +125,9 @@ export async function runTrivy(targetPath: string): Promise<unknown> {
     }
 
     return JSON.parse(stdout);
-  } catch (err) {
-    console.error(`❌ [TRIVY] Scan failed:`, err);
-    throw new Error('Trivy scan execution failed');
+  } catch (err: any) {
+    console.error(`❌ [TRIVY] Scan execution failed:`, err.message);
+    throw new Error(`Trivy scan execution failed: ${err.message}`);
   }
 }
 
