@@ -31,22 +31,28 @@ graph LR
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Docker Desktop** (Required for DB & Redis)
 - **Node.js 20+**
 - **npm 10+**
+- **PostgreSQL 16** — `winget install -e --id PostgreSQL.PostgreSQL.16`
+- **Redis (Windows)** — `winget install -e --id Redis.Redis`
+
+> **Note:** Docker-based setup is planned for a future release to enable one-command startup and easier cross-platform portability.
 
 ### 1. Zero to Hero Setup
 ```bash
-# Start Infrastructure
-docker-compose up -d
+# 1. Install PostgreSQL 16 (wizard will open — set password to: devlens)
+winget install -e --id PostgreSQL.PostgreSQL.16
 
-# Install Dependencies
-npm install
+# 2. Install Redis for Windows (installs as Windows Service on port 6379)
+winget install -e --id Redis.Redis
 
-# Setup Database
-cd apps/backend
-npx prisma db push
-npx ts-node prisma/seed.ts
+# 3. Create the devlens DB user (run in psql as postgres superuser)
+# CREATE USER devlens WITH PASSWORD 'devlens';
+# CREATE DATABASE devlens OWNER devlens;
+# GRANT ALL PRIVILEGES ON DATABASE devlens TO devlens;
+
+# 4. Install dependencies + push schema + seed
+npm run setup
 ```
 
 ### 2. Launching the Platform
