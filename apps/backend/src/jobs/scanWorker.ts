@@ -7,6 +7,7 @@ import { calculateRiskScore } from '../services/riskScoreService';
 import { updateDeploymentStatus } from '../services/deploymentService';
 import { wsEvents } from '../websocket/index';
 import { cloneRepository, cleanupDirectory } from '../utils/git';
+import { sendSlackAlert } from '../services/slackService';
 import prisma from '../db/prisma';
 import path from 'path';
 import os from 'os';
@@ -18,6 +19,8 @@ interface ScanJobData {
   service_name: string;
   image_name: string;
   repo_url?: string;
+  commit_sha?: string;
+  branch?: string;
 }
 
 const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
@@ -107,6 +110,18 @@ const worker = new Worker<ScanJobData>(
         } else {
           console.log(`✅ [POLICY PASS] Deployment successful for ${service_name}`);
         }
+
+        // 9. Send Slack Alert
+        await sendSlackAlert({
+          serviceName: service_name,
+          environment: environment,
+          status: finalStatus as 'success' | 'failed',
+          riskScore: Number(riskScore.score),
+          criticalCount: criticalCveCount + secretCount,
+          pipelineUrl: job.data.repo_url ? undefined : 'https://github.com/yuvrajgohil24/DevLens/actions',
+          commitSha: job.data.commit_sha || 'unknown',
+          branch: job.data.branch || 'main'
+        });
 
       } finally {
         if (isTemp) await cleanupDirectory(scanTargetPath);

@@ -63,6 +63,8 @@ export async function handlePipelineWebhook(req: Request, res: Response) {
       service_name,
       repo_url,
       image_name: `${service_name}:${commit_sha.slice(0, 7)}`,
+      commit_sha,
+      branch,
     });
     console.log(`📋 Scan enqueued for deployment ${deployment.id.slice(0, 8)}`);
 
