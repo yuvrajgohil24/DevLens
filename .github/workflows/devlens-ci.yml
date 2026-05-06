@@ -2,7 +2,7 @@ name: DevLens CI — Self Monitoring
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, deploy-testing]
   workflow_dispatch:
 
 jobs:

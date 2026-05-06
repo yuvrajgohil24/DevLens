@@ -1,6 +1,9 @@
-# DevLens — Unified Developer Platform
+# 🛡️ DevLens — Unified Developer Platform
 
-> **Code → Deploy → Monitor → Secure** in one platform.
+> [!IMPORTANT]
+> **Deployment Test**: Verifying the GitHub Webhook connection on `deploy-testing` branch.
+
+> **Build with Confidence. Deploy with Security. Monitor in Real-time.**
 
 ## Architecture
 
