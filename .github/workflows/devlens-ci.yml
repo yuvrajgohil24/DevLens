@@ -25,6 +25,7 @@ jobs:
         run: |
           curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
+            -H "Bypass-Tunnel-Reminder: true" \
             -d '{
               "commit_sha":      "${{ github.sha }}",
               "service_name":    "devlens",
@@ -53,6 +54,7 @@ jobs:
         run: |
           curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
+            -H "Bypass-Tunnel-Reminder: true" \
             -d '{
               "commit_sha": "${{ github.sha }}",
               "service_name": "devlens",
@@ -69,6 +71,7 @@ jobs:
         run: |
           curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
+            -H "Bypass-Tunnel-Reminder: true" \
             -d '{
               "commit_sha": "${{ github.sha }}",
               "service_name": "devlens",
