@@ -26,6 +26,7 @@ jobs:
           curl -v --max-time 60 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
             -H "Bypass-Tunnel-Reminder: true" \
+            -H "ngrok-skip-browser-warning: true" \
             -d '{
               "commit_sha":      "${{ github.sha }}",
               "service_name":    "devlens",
@@ -55,6 +56,7 @@ jobs:
           curl -v --max-time 60 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
             -H "Bypass-Tunnel-Reminder: true" \
+            -H "ngrok-skip-browser-warning: true" \
             -d '{
               "commit_sha": "${{ github.sha }}",
               "service_name": "devlens",
@@ -72,6 +74,7 @@ jobs:
           curl -v --max-time 60 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
             -H "Bypass-Tunnel-Reminder: true" \
+            -H "ngrok-skip-browser-warning: true" \
             -d '{
               "commit_sha": "${{ github.sha }}",
               "service_name": "devlens",
