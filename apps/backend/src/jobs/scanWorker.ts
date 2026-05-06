@@ -21,6 +21,7 @@ interface ScanJobData {
   repo_url?: string;
   commit_sha?: string;
   branch?: string;
+  environment: string;
 }
 
 const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
@@ -30,7 +31,7 @@ const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379'
 const worker = new Worker<ScanJobData>(
   'scan-queue',
   async (job: Job<ScanJobData>) => {
-    const { deployment_id, service_id, service_name, image_name, repo_url } = job.data;
+    const { deployment_id, service_id, service_name, image_name, repo_url, environment } = job.data;
     console.log(`\n🔬 Starting scan job [${job.id}] for ${image_name}`);
 
     // 1. Create scan records
@@ -114,7 +115,7 @@ const worker = new Worker<ScanJobData>(
         // 9. Send Slack Alert
         await sendSlackAlert({
           serviceName: service_name,
-          environment: environment,
+          environment: environment || 'staging',
           status: finalStatus as 'success' | 'failed',
           riskScore: Number(riskScore.score),
           criticalCount: criticalCveCount + secretCount,
