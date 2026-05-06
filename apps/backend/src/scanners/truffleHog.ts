@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+import { pathToFileURL } from 'url';
 
 const execAsync = promisify(exec);
 
@@ -21,9 +22,9 @@ export async function runTruffleHog(repoPath: string): Promise<string> {
   // Use the absolute path to our newly installed TruffleHog
   const truffleHogBin = path.resolve(process.cwd(), 'bin', 'trufflehog.exe');
   
-  // We normalize the Windows path format so TruffleHog's git parser accepts it as a valid URI
-  const normalizedPath = repoPath.replace(/\\/g, '/');
-  const command = `"${truffleHogBin}" git "file:///${normalizedPath}" --json --no-update`;
+  // Correctly format the file URI for Windows using standard Node.js utilities
+  const fileUri = pathToFileURL(repoPath).toString();
+  const command = `"${truffleHogBin}" git "${fileUri}" --json --no-update`;
   
   console.log(`🔍 [TRUFFLEHOG] Scanning full git history: ${command}`);
   
