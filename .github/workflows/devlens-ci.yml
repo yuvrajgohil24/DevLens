@@ -23,7 +23,7 @@ jobs:
         if: env.WEBHOOK_URL != ''
         continue-on-error: true
         run: |
-          curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
+          curl --max-time 15 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
             -H "Bypass-Tunnel-Reminder: true" \
             -d '{
@@ -52,7 +52,7 @@ jobs:
         if: success() && env.WEBHOOK_URL != ''
         continue-on-error: true
         run: |
-          curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
+          curl --max-time 15 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
             -H "Bypass-Tunnel-Reminder: true" \
             -d '{
@@ -69,7 +69,7 @@ jobs:
         if: failure() && env.WEBHOOK_URL != ''
         continue-on-error: true
         run: |
-          curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
+          curl --max-time 15 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
             -H "Bypass-Tunnel-Reminder: true" \
             -d '{
