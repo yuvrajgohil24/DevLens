@@ -1,7 +1,7 @@
 # 🛡️ DevLens — Unified Developer Platform
 
 > [!IMPORTANT]
-> **Deployment Test**: Verifying the GitHub Webhook connection on `deploy-testing` branch.
+> **Deployment Test**: Verifying the GitHub Webhook connection and **Slack Notifications** on `deploy-testing` branch.
 
 > **Build with Confidence. Deploy with Security. Monitor in Real-time.**
 
