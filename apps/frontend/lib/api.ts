@@ -103,6 +103,11 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ action }) }
       ),
   },
+
+  analytics: {
+    riskTrends: (serviceId?: string) => apiFetch<{ data: Array<{ date: string; score: number; service: string }> }>(`/api/analytics/risk-trends${buildQuery({ serviceId })}`),
+    mttr: () => apiFetch<{ data: Array<{ month: string; mttrHours: number }>; current: number; unit: string; trend: number }>('/api/analytics/mttr'),
+  },
 };
 
 // ── Types ──────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { runTrivy, parseTrivyOutput } from '../scanners/trivy';
 import { runTruffleHog, parseTruffleHogOutput } from '../scanners/truffleHog';
+import { runSnyk, parseSnykOutput } from '../scanners/snyk';
 import { createScan, completeScan, failScan, insertVulnerabilities, insertSecrets } from '../services/scanService';
 import { calculateRiskScore } from '../services/riskScoreService';
 import { updateDeploymentStatus } from '../services/deploymentService';
@@ -32,6 +33,7 @@ const worker = new Worker<ScanJobData>(
     // 1. Create scan records
     const trivyScan = await createScan(deployment_id, 'trivy');
     const truffleScan = await createScan(deployment_id, 'trufflehog');
+    const snykScan = await createScan(deployment_id, 'snyk');
 
     try {
       // 2. Update deployment to running
@@ -56,11 +58,22 @@ const worker = new Worker<ScanJobData>(
         
         // --- TRIVY (CVEs) ---
         const trivyOutput = await runTrivy(scanTargetPath);
-        const parsedVulns = parseTrivyOutput(trivyOutput);
+        const parsedTrivyVulns = parseTrivyOutput(trivyOutput);
         await insertVulnerabilities(
-          parsedVulns.map(v => ({ ...v, scanId: trivyScan.id, deploymentId: deployment_id, serviceId: service_id }))
+          parsedTrivyVulns.map(v => ({ ...v, scanId: trivyScan.id, deploymentId: deployment_id, serviceId: service_id }))
         );
         await completeScan(trivyScan.id, trivyOutput);
+
+        // --- SNYK (SCA) ---
+        const snykOutput = await runSnyk(scanTargetPath);
+        const parsedSnykVulns = parseSnykOutput(snykOutput);
+        await insertVulnerabilities(
+          parsedSnykVulns.map(v => ({ ...v, scanId: snykScan.id, deploymentId: deployment_id, serviceId: service_id }))
+        );
+        await completeScan(snykScan.id, snykOutput);
+
+        // Combine vulnerabilities
+        const parsedVulns = [...parsedTrivyVulns, ...parsedSnykVulns];
 
         // --- TRUFFLEHOG (Secrets) ---
         const truffleOutput = await runTruffleHog(scanTargetPath);
@@ -134,6 +147,7 @@ const worker = new Worker<ScanJobData>(
     } catch (err: any) {
       await failScan(trivyScan.id, String(err));
       await failScan(truffleScan.id, String(err));
+      await failScan(snykScan.id, String(err));
       await updateDeploymentStatus(deployment_id, 'failed', new Date());
 
       // Notify Slack about system failure

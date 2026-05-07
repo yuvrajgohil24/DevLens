@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
 
 const SEV_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e'];
 
@@ -59,6 +59,8 @@ function StatCard({ title, value, sub, icon: Icon, color }: {
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardOverview | null>(null);
+  const [riskTrends, setRiskTrends] = useState<any[]>([]);
+  const [mttrData, setMttrData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { lastDeployment, lastScan } = useWebSocket();
 
@@ -66,6 +68,12 @@ export default function DashboardPage() {
     try {
       const overview = await api.dashboard.overview();
       setData(overview);
+      
+      const trends = await api.analytics.riskTrends();
+      setRiskTrends(trends.data || []);
+      
+      const mttr = await api.analytics.mttr();
+      setMttrData(mttr || null);
     } catch (e) {
       console.error(e);
     } finally {
@@ -202,6 +210,76 @@ export default function DashboardPage() {
             <Link href="/vulnerabilities" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: '0.78rem', color: 'var(--primary)', textDecoration: 'none' }}>
               View all vulnerabilities →
             </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Analytics Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {/* Risk Trends */}
+        <div className="glass-card" style={{ padding: 20, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <TrendingUp size={15} color="var(--accent)" />
+            <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>System Risk Trends</span>
+          </div>
+          <div style={{ height: 200, minWidth: 0, minHeight: 0 }}>
+            {riskTrends.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={riskTrends}>
+                  <defs>
+                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ background:'#000', border:'1px solid var(--border)', borderRadius:4, fontSize:'0.75rem', fontFamily: 'var(--font-mono)' }} 
+                  />
+                  <Area type="monotone" dataKey="score" stroke="var(--accent)" fillOpacity={1} fill="url(#colorScore)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                No trend data available (waiting for scans)
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* MTTR */}
+        <div className="glass-card" style={{ padding: 20, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Activity size={15} color="var(--primary)" />
+              <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Mean Time To Recovery (MTTR)</span>
+            </div>
+            {mttrData && (
+              <div style={{ fontSize: '0.75rem', color: mttrData.trend < 0 ? 'var(--primary)' : 'var(--critical)', fontWeight: 600, background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 12 }}>
+                {mttrData.trend > 0 ? '+' : ''}{mttrData.trend}%
+              </div>
+            )}
+          </div>
+          <div style={{ height: 200, minWidth: 0, minHeight: 0 }}>
+            {mttrData?.data?.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={mttrData.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ background:'#000', border:'1px solid var(--border)', borderRadius:4, fontSize:'0.75rem', fontFamily: 'var(--font-mono)' }} 
+                  />
+                  <Line type="monotone" dataKey="mttrHours" stroke="var(--primary)" strokeWidth={2} dot={{ r: 4, fill: 'var(--primary)' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                No MTTR data available
+              </div>
+            )}
           </div>
         </div>
       </div>

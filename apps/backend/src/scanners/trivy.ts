@@ -111,9 +111,12 @@ const CVE_POOL: NormalizedVulnerability[] = [
   },
 ];
 
+import fs from 'fs';
+
 export async function runTrivy(targetPath: string): Promise<unknown> {
-  const trivyPath = String.raw`C:\Users\YUVRAJ SINGH\AppData\Local\Microsoft\WinGet\Packages\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe\trivy.exe`;
-  const command = `"${trivyPath}" fs --format json --scanners vuln --skip-dirs "**/node_modules" --skip-dirs "**/.next" --skip-dirs "**/dist" --skip-dirs "**/.git" --skip-dirs "**/pkg" --skip-dirs "**/tmp" "${path.resolve(targetPath)}"`;
+  const customTrivyPath = String.raw`C:\Users\YUVRAJ SINGH\AppData\Local\Microsoft\WinGet\Packages\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe\trivy.exe`;
+  const trivyPath = fs.existsSync(customTrivyPath) ? `"${customTrivyPath}"` : 'trivy';
+  const command = `${trivyPath} fs --format json --scanners vuln --skip-dirs "**/node_modules" --skip-dirs "**/.next" --skip-dirs "**/dist" --skip-dirs "**/.git" --skip-dirs "**/pkg" --skip-dirs "**/tmp" "${path.resolve(targetPath)}"`;
   
   console.log(`🔍 [TRIVY] Running real scan: ${command}`);
   

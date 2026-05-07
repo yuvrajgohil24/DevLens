@@ -19,6 +19,7 @@ import {
   getLocalGitStatus,
   executeGitAction,
 } from './api/devflow';
+import { getRiskTrends, getMttr } from './api/analytics';
 
 const app = express();
 
@@ -81,6 +82,10 @@ app.post('/api/devflow/repos/:repoId/deploy', triggerDeploy);
 app.get('/api/devflow/deployments/:id/status', getDeploymentStatus);
 app.get('/api/devflow/repos/:repoId/git/status', getLocalGitStatus);
 app.post('/api/devflow/repos/:repoId/git/action', executeGitAction);
+
+// ── Analytics ──────────────────────────────────────────────
+app.get('/api/analytics/risk-trends', getRiskTrends);
+app.get('/api/analytics/mttr', getMttr);
 
 // ── 404 ────────────────────────────────────────────────────
 app.use((_req, res) => {
