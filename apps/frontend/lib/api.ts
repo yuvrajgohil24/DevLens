@@ -56,6 +56,7 @@ export const api = {
   },
 
   devflow: {
+    repos: () => apiFetch<{ data: string[] }>('/api/devflow/repos'),
     branches: (repoId: string) => apiFetch<{ data: Branch[]; repo: string }>(`/api/devflow/repos/${repoId}/branches`),
     commits: (repoId: string, branch?: string) =>
       apiFetch<{ data: Commit[] }>(`/api/devflow/repos/${repoId}/commits${branch ? `?branch=${branch}` : ''}`),

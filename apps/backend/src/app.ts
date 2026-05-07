@@ -11,6 +11,7 @@ import { listVulnerabilities, resolveVulnerability } from './api/vulnerabilities
 import { listServices, getService, getServiceRiskHistory } from './api/services';
 import { listPolicyViolations, resolvePolicyViolation } from './api/policyViolations';
 import {
+  getRepos,
   getBranches,
   getCommits,
   triggerDeploy,
@@ -60,6 +61,7 @@ app.get('/api/policy-violations', listPolicyViolations);
 app.patch('/api/policy-violations/:id/resolve', resolvePolicyViolation);
 
 // ── DevFlow ────────────────────────────────────────────────
+app.get('/api/devflow/repos', getRepos);
 app.get('/api/devflow/repos/:repoId/branches', getBranches);
 app.get('/api/devflow/repos/:repoId/commits', getCommits);
 app.post('/api/devflow/repos/:repoId/deploy', triggerDeploy);

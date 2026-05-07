@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api, Branch, Commit } from '@/lib/api';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
@@ -9,15 +9,15 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-const SERVICES = ['auth-api', 'payment-service', 'user-service', 'api-gateway', 'notification-service'];
 const ENVS = ['staging', 'production'];
 
 export default function DevFlowPage() {
-  const [selectedRepo, setSelectedRepo]   = useState(SERVICES[0]);
-  const [selectedBranch, setSelectedBranch] = useState('main');
-  const [selectedEnv, setSelectedEnv]       = useState('staging');
-  const [branches, setBranches]             = useState<Branch[]>([]);
-  const [commits, setCommits]               = useState<Commit[]>([]);
+  const [repos, setRepos]                     = useState<string[]>(['DevLens']);
+  const [selectedRepo, setSelectedRepo]       = useState('DevLens');
+  const [selectedBranch, setSelectedBranch]   = useState('main');
+  const [selectedEnv, setSelectedEnv]         = useState('staging');
+  const [branches, setBranches]               = useState<Branch[]>([]);
+  const [commits, setCommits]                 = useState<Commit[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [loadingCommits, setLoadingCommits]   = useState(false);
   const [deploying, setDeploying]             = useState(false);
@@ -31,12 +31,34 @@ export default function DevFlowPage() {
     setLoadingBranches(false);
   };
 
+  useEffect(() => {
+    // Fetch available repos
+    api.devflow.repos().then((res) => {
+      if (res.data && res.data.length > 0) {
+        setRepos(res.data);
+        if (!res.data.includes(selectedRepo)) {
+          setSelectedRepo(res.data[0]);
+        }
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    // Automatically load branches when repo changes
+    loadBranches();
+  }, [selectedRepo]);
+
   const loadCommits = async () => {
     setLoadingCommits(true);
     const { data } = await api.devflow.commits(selectedRepo, selectedBranch);
     setCommits(data);
     setLoadingCommits(false);
   };
+
+  useEffect(() => {
+    // Automatically load commits when repo or branch changes
+    loadCommits();
+  }, [selectedRepo, selectedBranch]);
 
   const handleDeploy = async (commitMsg?: string) => {
     setDeploying(true);
@@ -96,7 +118,7 @@ export default function DevFlowPage() {
             <div style={{ fontSize:'0.7rem', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Service</div>
             <div style={{ position:'relative' }}>
               <select value={selectedRepo} onChange={e=>setSelectedRepo(e.target.value)} style={selectStyle}>
-                {SERVICES.map(s=><option key={s} value={s}>{s}</option>)}
+                {repos.map(s=><option key={s} value={s}>{s}</option>)}
               </select>
               <ChevronDown size={13} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', pointerEvents:'none' }} />
             </div>
@@ -107,7 +129,7 @@ export default function DevFlowPage() {
             <div style={{ display:'flex', gap:6 }}>
               <div style={{ position:'relative' }}>
                 <select value={selectedBranch} onChange={e=>setSelectedBranch(e.target.value)} style={selectStyle}>
-                  {['main','develop','feature/auth-refresh','fix/payment-race'].map(b=><option key={b} value={b}>{b}</option>)}
+                  {(branches.length > 0 ? branches.map(b => b.name) : [selectedBranch]).map(b=><option key={b} value={b}>{b}</option>)}
                 </select>
                 <ChevronDown size={13} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', pointerEvents:'none' }} />
               </div>
