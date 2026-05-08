@@ -12,7 +12,6 @@ import { sendSlackAlert } from '../services/slackService';
 import prisma from '../db/prisma';
 import path from 'path';
 import os from 'os';
-import { sendSlackAlert } from '../services/slackService';
 interface ScanJobData {
   deployment_id: string;
   service_id: string;

@@ -16,7 +16,6 @@ import {
   getCommits,
   triggerDeploy,
   getDeploymentStatus,
-  getRepos,
   getLocalGitStatus,
   executeGitAction,
 } from './api/devflow';

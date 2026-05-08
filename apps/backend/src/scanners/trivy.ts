@@ -116,10 +116,10 @@ import fs from 'fs';
 export async function runTrivy(targetPath: string): Promise<unknown> {
   // Try to find trivy in common locations
   const trivyPaths = [
-    String.raw`C:\Users\YUVRAJ SINGH\AppData\Local\Microsoft\WinGet\Packages\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe\trivy.exe`,
+    process.env.TRIVY_BIN, // Allow override via .env
     'trivy',
     'trivy.exe',
-  ];
+  ].filter(Boolean) as string[];
 
   for (const trivyBin of trivyPaths) {
     const command = `"${trivyBin}" fs --format json "${targetPath}"`;
