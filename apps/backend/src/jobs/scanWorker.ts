@@ -20,7 +20,9 @@ interface ScanJobData {
   repo_url?: string;
   commit_sha?: string;
   branch?: string;
+  author?: string;
   environment: string;
+  pipeline_url?: string;
 }
 
 const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
@@ -151,7 +153,7 @@ const worker = new Worker<ScanJobData>(
           status: finalStatus as 'success' | 'failed',
           riskScore: Number(riskScore.score),
           criticalCount: criticalCveCount + secretCount,
-          pipelineUrl: job.data.repo_url ? undefined : 'https://github.com/yuvrajgohil24/DevLens/actions',
+          pipelineUrl: job.data.pipeline_url || job.data.repo_url || 'https://github.com/yuvrajgohil24/DevLens/actions',
           commitSha: job.data.commit_sha || 'unknown',
           branch: job.data.branch || 'main'
         });
