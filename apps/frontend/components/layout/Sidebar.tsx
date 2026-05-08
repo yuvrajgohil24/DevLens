@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Rocket, ShieldAlert, Server,
   GitBranch, AlertTriangle, Zap,
 } from 'lucide-react';
+import { UserButton, useUser, SignInButton } from '@clerk/nextjs';
 
 const NAV = [
   { href: '/dashboard',          label: 'Dashboard',       color: 'var(--primary)' },
@@ -18,6 +19,7 @@ const NAV = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { isSignedIn } = useUser();
 
   return (
     <aside className="sidebar">
@@ -61,16 +63,6 @@ export function Sidebar() {
                 transition: 'all 0.1s',
                 cursor: 'pointer',
               }}
-              onMouseEnter={e => {
-                if (!active) {
-                  (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)';
-                }
-              }}
-              onMouseLeave={e => {
-                if (!active) {
-                  (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
-                }
-              }}
               >
                 <span style={{ 
                   width: 8, height: 8, borderRadius: '50%', background: color,
@@ -85,9 +77,18 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-          Phase 1 MVP · v0.1.0
+          v0.1.0
+        </div>
+        <div>
+          {isSignedIn ? (
+            <UserButton />
+          ) : (
+            <SignInButton mode="modal">
+              <button style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: '0.7rem', cursor: 'pointer' }}>Sign In</button>
+            </SignInButton>
+          )}
         </div>
       </div>
     </aside>

@@ -21,94 +21,68 @@ GitHub Push → GitHub Actions → POST /api/webhooks/pipeline
                               Socket.io → Dashboard live update
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
-- **Docker Desktop** must be running
-- Node.js 20+, npm 10+
+- **Node.js 20+**
+- **npm 10+**
+- **PostgreSQL 16** — `winget install -e --id PostgreSQL.PostgreSQL.16`
+- **Redis (Windows)** — `winget install -e --id Redis.Redis`
 
-### 1. Start the database + Redis
+> **Note:** Docker-based setup is planned for a future release to enable one-command startup and easier cross-platform portability.
+
+### 1. Zero to Hero Setup
 ```bash
-docker-compose up -d
+# 1. Install PostgreSQL 16 (wizard will open — set password to: devlens)
+winget install -e --id PostgreSQL.PostgreSQL.16
+
+# 2. Install Redis for Windows (installs as Windows Service on port 6379)
+winget install -e --id Redis.Redis
+
+# 3. Create the devlens DB user (run in psql as postgres superuser)
+# CREATE USER devlens WITH PASSWORD 'devlens';
+# CREATE DATABASE devlens OWNER devlens;
+# GRANT ALL PRIVILEGES ON DATABASE devlens TO devlens;
+
+# 4. Install dependencies + push schema + seed
+npm run setup
 ```
 
-### 2. Install all dependencies
+### 2. Launching the Platform
 ```bash
-npm install          # root (concurrently)
-cd apps/backend && npm install
-cd apps/frontend && npm install
-```
-
-### 3. Push schema + seed data
-```bash
-cd apps/backend
-npx prisma db push
-npx ts-node prisma/seed.ts
-```
-
-### 4. Start both servers
-```bash
-# Terminal 1 — Backend (port 4000)
+# Terminal 1 — Backend (Port 4000)
 cd apps/backend && npm run dev
 
-# Terminal 2 — Frontend (port 3000)
+# Terminal 2 — Frontend (Port 3000)
 cd apps/frontend && npm run dev
 ```
 
-### 5. Open the dashboard
-```
-http://localhost:3000
-```
+---
 
-### 6. Test the webhook (new Terminal)
-```bash
-curl -X POST http://localhost:4000/api/webhooks/pipeline \
-  -H "Content-Type: application/json" \
-  -d '{
-    "commit_sha": "a1b2c3d4e5f6a1b2",
-    "service_name": "auth-api",
-    "branch": "main",
-    "author": "dev@example.com",
-    "status": "running",
-    "environment": "production",
-    "commit_message": "feat: add JWT refresh tokens"
-  }'
-```
-
-Watch the dashboard update live — deployment created, scan runs, CVEs appear, risk score updates.
-
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Backend | Node.js 20, Express 5, TypeScript |
-| ORM | Prisma 5 + PostgreSQL 16 |
-| Queue | BullMQ + Redis 7 |
-| Real-time | Socket.io |
-| Frontend | Next.js 15, TailwindCSS, shadcn/ui |
-| Charts | Recharts |
-| Scanner | Trivy (mock Phase 1, real Phase 2) |
+| **Frontend** | Next.js 15, TailwindCSS, Socket.io-client, Recharts |
+| **Backend** | Express 5, TypeScript, Socket.io, BullMQ |
+| **Data** | Prisma ORM, PostgreSQL 16, Redis 7 |
+| **Security** | Aqua Security Trivy, TruffleHog |
 
-## API Endpoints
+---
 
-```
-POST   /api/webhooks/pipeline          ← core flow entry
-GET    /api/dashboard/overview
-GET    /api/deployments?env=&status=
-GET    /api/deployments/:id
-GET    /api/vulnerabilities?severity=&resolved=
-PATCH  /api/vulnerabilities/:id/resolve
-GET    /api/services
-GET    /api/services/:id/risk-history
-GET    /api/policy-violations
-GET    /api/devflow/repos/:id/branches
-GET    /api/devflow/repos/:id/commits
-POST   /api/devflow/repos/:id/deploy
-WS     ws://localhost:4000             ← live events
-```
+## 📡 API Hub
 
-## Phase Roadmap
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/webhooks/pipeline` | Entry point for deployments |
+| `GET` | `/api/dashboard/overview` | Platform health & stats |
+| `GET` | `/api/vulnerabilities` | Security scan results |
+| `GET` | `/api/devflow/repos` | Connected repositories |
 
-- **Phase 1 (now)** — Core flow, mock Trivy, dashboard MVP ✅
-- **Phase 2** — Real Trivy CLI, TruffleHog, DevFlow Git UI
-- **Phase 3** — Snyk, Clerk auth, AWS EC2, Slack alerts, demo video
+---
+
+## 🗺️ Roadmap
+
+- [x] **Phase 1**: Core Live Dashboard & Mock Pipelines
+- [x] **Phase 2**: Real-time Trivy & TruffleHog Integration
+- [ ] **Phase 3**: Slack/Email Alerts & Managed Cloud Deployment

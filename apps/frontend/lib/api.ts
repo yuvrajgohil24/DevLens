@@ -10,10 +10,40 @@ function buildQuery(params?: Record<string, string | number | boolean | undefine
   return str ? `?${str}` : '';
 }
 
+async function waitForClerk(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  if ((window as any).Clerk?.isReady) return true;
+
+  return new Promise((resolve) => {
+    const interval = setInterval(() => {
+      if ((window as any).Clerk?.isReady) {
+        clearInterval(interval);
+        resolve(true);
+      }
+    }, 50);
+    setTimeout(() => { clearInterval(interval); resolve(false); }, 3000); // 3s timeout
+  });
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  
+  if (typeof window !== 'undefined') {
+    await waitForClerk();
+    const clerk = (window as any).Clerk;
+    if (clerk?.session) {
+      try {
+        const token = await clerk.session.getToken();
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+      } catch (err) {
+        console.warn('⚠️ [API] Token retrieval failed:', err);
+      }
+    }
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
+    headers: { ...headers, ...options?.headers },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -56,16 +86,27 @@ export const api = {
   },
 
   devflow: {
-    repos: () => apiFetch<{ data: string[] }>('/api/devflow/repos'),
+    repos: () => apiFetch<{ data: any[] }>('/api/devflow/repos'),
     branches: (repoId: string) => apiFetch<{ data: Branch[]; repo: string }>(`/api/devflow/repos/${repoId}/branches`),
     commits: (repoId: string, branch?: string) =>
       apiFetch<{ data: Commit[] }>(`/api/devflow/repos/${repoId}/commits${branch ? `?branch=${branch}` : ''}`),
-    deploy: (repoId: string, body: { branch: string; environment: string; commit_message?: string }) =>
-      apiFetch<{ success: boolean; deployment_id: string; commit_sha: string; message: string }>(
+    deploy: (repoId: string, body: { branch: string; environment: string; commit_sha?: string; commit_message?: string }) =>
+      apiFetch<{ success: boolean; deployment_id: string; commit_sha: string; message: string; github_url?: string }>(
         `/api/devflow/repos/${repoId}/deploy`,
         { method: 'POST', body: JSON.stringify(body) }
       ),
     deploymentStatus: (id: string) => apiFetch(`/api/devflow/deployments/${id}/status`),
+    gitStatus: (repoId: string) => apiFetch<{ success: boolean; data: any }>(`/api/devflow/repos/${repoId}/git/status`),
+    gitAction: (repoId: string, action: 'push' | 'pull' | 'fetch') =>
+      apiFetch<{ success: boolean; message: string; output: string }>(
+        `/api/devflow/repos/${repoId}/git/action`,
+        { method: 'POST', body: JSON.stringify({ action }) }
+      ),
+  },
+
+  analytics: {
+    riskTrends: (serviceId?: string) => apiFetch<{ data: Array<{ date: string; score: number; service: string }> }>(`/api/analytics/risk-trends${buildQuery({ serviceId })}`),
+    mttr: () => apiFetch<{ data: Array<{ month: string; mttrHours: number }>; current: number; unit: string; trend: number }>('/api/analytics/mttr'),
   },
 };
 

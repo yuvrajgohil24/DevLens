@@ -12,9 +12,17 @@
     "db:push": "npm run db:push --workspace=apps/backend",
     "db:seed": "npm run db:seed --workspace=apps/backend",
     "db:studio": "npm run db:studio --workspace=apps/backend",
-    "setup": "docker-compose up -d && timeout 8 && npm run db:push && npm run db:seed"
+    "setup": "npm install && npm run db:push && npm run db:seed"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "overrides": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "dependencies": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   }
 }

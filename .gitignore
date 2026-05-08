@@ -13,6 +13,7 @@ out/
 .env
 .env.local
 .env.*.local
+apps/backend/.env
 !.env.example
 
 # Prisma
@@ -47,3 +48,8 @@ apps/backend/bin/
 bin/
 *.exe
 *.tar.gz
+
+# Local documentation and logs
+PROJECT_OVERVIEW.md
+apps/frontend/build_log*.txt
+

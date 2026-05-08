@@ -111,6 +111,8 @@ const CVE_POOL: NormalizedVulnerability[] = [
   },
 ];
 
+import fs from 'fs';
+
 export async function runTrivy(targetPath: string): Promise<unknown> {
   // Try to find trivy in common locations
   const trivyPaths = [

@@ -16,7 +16,11 @@ import {
   getCommits,
   triggerDeploy,
   getDeploymentStatus,
+  getRepos,
+  getLocalGitStatus,
+  executeGitAction,
 } from './api/devflow';
+import { getRiskTrends, getMttr } from './api/analytics';
 
 const app = express();
 
@@ -26,6 +30,7 @@ app.use(
   cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 app.use(morgan('dev'));
@@ -35,6 +40,16 @@ app.use(express.urlencoded({ extended: true }));
 // ── Health ─────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'devlens-backend' });
+});
+
+// ── Auth Middleware ──────────────────────────────────────────
+import { protectRoute } from './middleware/auth';
+app.use((req, res, next) => {
+  // Protect all /api/ routes EXCEPT webhooks
+  if (req.path.startsWith('/api/') && !req.path.startsWith('/api/webhooks/')) {
+    return protectRoute(req, res, next);
+  }
+  next();
 });
 
 // ── Webhooks ───────────────────────────────────────────────
@@ -66,6 +81,12 @@ app.get('/api/devflow/repos/:repoId/branches', getBranches);
 app.get('/api/devflow/repos/:repoId/commits', getCommits);
 app.post('/api/devflow/repos/:repoId/deploy', triggerDeploy);
 app.get('/api/devflow/deployments/:id/status', getDeploymentStatus);
+app.get('/api/devflow/repos/:repoId/git/status', getLocalGitStatus);
+app.post('/api/devflow/repos/:repoId/git/action', executeGitAction);
+
+// ── Analytics ──────────────────────────────────────────────
+app.get('/api/analytics/risk-trends', getRiskTrends);
+app.get('/api/analytics/mttr', getMttr);
 
 // ── 404 ────────────────────────────────────────────────────
 app.use((_req, res) => {

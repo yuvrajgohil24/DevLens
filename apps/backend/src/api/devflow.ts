@@ -4,148 +4,63 @@ import { scanQueue } from '../db/redis';
 import { getOrCreateService } from '../services/serviceService';
 import { createDeployment } from '../services/deploymentService';
 import { wsEvents } from '../websocket/index';
+import {
+  getRepoBranches as ghGetBranches,
+  getRepoCommits as ghGetCommits,
+  getOwnerRepos,
+  resolveRepo,
+} from '../services/githubService';
 
 // GET /api/devflow/repos
-export async function getRepos(req: Request, res: Response) {
-  if (process.env.GITHUB_TOKEN) {
-    try {
-      // Use /user/repos to get repos for the authenticated user, or /users/{owner}/repos if preferred.
-      // /user/repos returns all repos the token has access to.
-      const response = await fetch(`https://api.github.com/user/repos?per_page=100&sort=updated`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'DevLens-Backend'
-        }
-      });
-
-      if (response.ok) {
-        const repos = (await response.json()) as any[];
-        const uniqueNames = Array.from(new Set(repos.map((r: any) => r.name)));
-        return res.json({ data: uniqueNames });
-      } else {
-        console.warn(`[GITHUB] Failed to fetch repos: ${response.status} ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error('[GITHUB] Error fetching repos:', error);
+export async function getRepos(_req: Request, res: Response) {
+  try {
+    if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_OWNER) {
+      return res.status(503).json({ error: 'GitHub credentials not configured. Set GITHUB_TOKEN and GITHUB_OWNER in .env' });
     }
+    const repos = await getOwnerRepos();
+    return res.json({ data: repos });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ [DevFlow] getRepos failed:', msg);
+    return res.status(500).json({ error: msg });
   }
-
-  // Fallback if no token or error
-  return res.json({
-    data: ['DevLens', 'auth-api', 'payment-service', 'user-service', 'api-gateway', 'notification-service'],
-  });
 }
 
 // GET /api/devflow/repos/:repoId/branches
 export async function getBranches(req: Request, res: Response) {
   const { repoId } = req.params;
-
-  if (process.env.GITHUB_TOKEN) {
-    try {
-      const owner = process.env.GITHUB_OWNER || 'yuvrajgohil24';
-      const targetRepo = repoId === 'DevLens' ? (process.env.GITHUB_REPO || 'DevLens') : repoId;
-
-      const response = await fetch(`https://api.github.com/repos/${owner}/${targetRepo}/branches`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'DevLens-Backend'
-        }
-      });
-
-      if (response.ok) {
-        const githubBranches = (await response.json()) as any[];
-        
-        const formattedBranches = githubBranches.map((b: any) => ({
-          name: b.name,
-          sha: b.commit.sha.slice(0, 7),
-          isDefault: b.name === 'main' || b.name === 'master',
-          updatedAt: new Date().toISOString(),
-        }));
-
-        return res.json({
-          data: formattedBranches,
-          repo: repoId,
-        });
-      } else {
-        console.warn(`[GITHUB] Failed to fetch branches: ${response.status} ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error('[GITHUB] Error fetching real branches:', error);
-    }
+  if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_OWNER) {
+    return res.status(503).json({ error: 'GitHub credentials not configured.' });
   }
-
-  // Phase 1: Return simulated branch data
-  return res.json({
-    data: [
-      { name: 'main', sha: 'a1b2c3d4e5f6', isDefault: true, updatedAt: new Date().toISOString() },
-      { name: 'develop', sha: 'b2c3d4e5f6a1', isDefault: false, updatedAt: new Date(Date.now() - 3600000).toISOString() },
-      { name: 'feature/auth-refresh', sha: 'c3d4e5f6a1b2', isDefault: false, updatedAt: new Date(Date.now() - 7200000).toISOString() },
-      { name: 'fix/payment-race', sha: 'd4e5f6a1b2c3', isDefault: false, updatedAt: new Date(Date.now() - 86400000).toISOString() },
-    ],
-    repo: repoId,
-  });
+  try {
+    const repoName = resolveRepo(repoId);
+    console.log(`🌿 [DevFlow] Fetching real branches for ${process.env.GITHUB_OWNER}/${repoName}`);
+    const branches = await ghGetBranches(repoName);
+    return res.json({ data: branches, repo: repoId, source: 'github' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ [DevFlow] getBranches failed:', msg);
+    return res.status(500).json({ error: msg });
+  }
 }
 
 // GET /api/devflow/repos/:repoId/commits
 export async function getCommits(req: Request, res: Response) {
   const { repoId } = req.params;
   const { branch = 'main' } = req.query;
-
-  if (process.env.GITHUB_TOKEN) {
-    try {
-      const owner = process.env.GITHUB_OWNER || 'yuvrajgohil24';
-      const targetRepo = repoId === 'DevLens' ? (process.env.GITHUB_REPO || 'DevLens') : repoId;
-
-      const response = await fetch(`https://api.github.com/repos/${owner}/${targetRepo}/commits?sha=${branch}&per_page=15`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'DevLens-Backend'
-        }
-      });
-
-      if (response.ok) {
-        const githubCommits = (await response.json()) as any[];
-        
-        const formattedCommits = githubCommits.map((c: any) => ({
-          sha: c.sha.slice(0, 8),
-          message: c.commit.message.split('\n')[0],
-          author: c.commit.author?.name || c.author?.login || 'unknown',
-          date: c.commit.author?.date || new Date().toISOString(),
-          branch,
-        }));
-
-        return res.json({ data: formattedCommits, repo: repoId, branch });
-      } else {
-        console.warn(`[GITHUB] Failed to fetch commits: ${response.status} ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error('[GITHUB] Error fetching real commits:', error);
-    }
+  if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_OWNER) {
+    return res.status(503).json({ error: 'GitHub credentials not configured.' });
   }
-
-  const commits = Array.from({ length: 10 }, (_, i) => ({
-    sha: Math.random().toString(16).slice(2, 10),
-    message: [
-      'feat: add JWT refresh token rotation',
-      'fix: resolve race condition in payment processor',
-      'chore: update dependencies to latest',
-      'feat: implement rate limiting middleware',
-      'fix: correct CORS headers for mobile clients',
-      'refactor: extract auth service to separate module',
-      'feat: add request tracing with correlation IDs',
-      'fix: handle null pointer in user lookup',
-      'chore: add health check endpoint',
-      'feat: implement circuit breaker pattern',
-    ][i],
-    author: ['yuvraj.singh', 'alice.dev', 'bob.ops', 'carol.infra'][i % 4],
-    date: new Date(Date.now() - i * 3600000 * 6).toISOString(),
-    branch,
-  }));
-
-  return res.json({ data: commits, repo: repoId, branch });
+  try {
+    const repoName = resolveRepo(repoId);
+    console.log(`📝 [DevFlow] Fetching real commits for ${process.env.GITHUB_OWNER}/${repoName}@${branch}`);
+    const commits = await ghGetCommits(repoName, String(branch));
+    return res.json({ data: commits, repo: repoId, branch, source: 'github' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ [DevFlow] getCommits failed:', msg);
+    return res.status(500).json({ error: msg });
+  }
 }
 
 // POST /api/devflow/repos/:repoId/deploy
@@ -154,52 +69,44 @@ export async function triggerDeploy(req: Request, res: Response) {
     const { repoId } = req.params;
     const { branch = 'main', environment = 'staging', commit_sha, commit_message } = req.body;
 
-    const simulatedSha = commit_sha || Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
-    
-    const owner = process.env.GITHUB_OWNER || 'yuvrajgohil24';
-    const targetRepo = repoId === 'DevLens' ? (process.env.GITHUB_REPO || 'DevLens') : repoId;
-    let repoUrl = `https://github.com/${owner}/${targetRepo}`;
-    let pipelineUrl = `https://github.com/${owner}/${targetRepo}/actions`;
+    const repoName = resolveRepo(repoId);
+    const owner = process.env.GITHUB_OWNER || 'unknown';
 
-    // Create the service + deployment records (same as webhook)
-    const service = await getOrCreateService(repoId, repoUrl);
+    // Use provided SHA (from real commit list) or generate one for manual deploys
+    const finalSha = commit_sha || Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
+
+    const service = await getOrCreateService(repoId, `https://github.com/${owner}/${repoName}`);
     const deployment = await createDeployment({
       serviceId: service.id,
-      commitSha: simulatedSha,
+      commitSha: finalSha,
       commitMessage: commit_message || `Manual deploy: ${branch} → ${environment}`,
       branch,
       author: 'devflow-ui',
       status: 'running',
       environment,
-      pipelineUrl,
+      pipelineUrl: `https://github.com/${owner}/${repoName}/commit/${finalSha}`,
     });
 
-    let cloneUrl = repoUrl;
-    if (process.env.GITHUB_TOKEN) {
-      cloneUrl = `https://${process.env.GITHUB_TOKEN}@github.com/${owner}/${targetRepo}.git`;
-    }
-
-    // Enqueue scan
+    // Enqueue security scan
     await scanQueue.add('trivy-scan', {
       deployment_id: deployment.id,
       service_id: service.id,
       service_name: repoId,
-      repo_url: cloneUrl,
-      image_name: `${repoId}:${simulatedSha.slice(0, 7)}`,
-      commit_sha: simulatedSha,
-      branch,
-      environment
+      image_name: `${repoName}:${finalSha.slice(0, 7)}`,
     });
 
     try {
       wsEvents.deploymentCreated({ deploymentId: deployment.id, serviceName: service.name, status: 'running' });
     } catch { /* non-fatal */ }
 
+    console.log(`🚀 [DevFlow] Deploy triggered: ${owner}/${repoName}@${branch} (${finalSha.slice(0, 7)}) → ${environment}`);
+
     return res.status(201).json({
       success: true,
       deployment_id: deployment.id,
-      commit_sha: simulatedSha,
+      commit_sha: finalSha,
       message: `Deployment triggered for ${repoId}@${branch} → ${environment}`,
+      github_url: `https://github.com/${owner}/${repoName}/commit/${finalSha}`,
     });
   } catch (err) {
     console.error('Deploy trigger error:', err);
@@ -227,5 +134,56 @@ export async function getDeploymentStatus(req: Request, res: Response) {
   } catch (err) {
     console.error('Deployment status error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// ── Local Git Operations ──────────────────────────────────────────────────
+
+import { getGitStatus, gitFetch, gitPull, gitPush } from '../services/gitService';
+
+// GET /api/devflow/repos/:repoId/git/status
+export async function getLocalGitStatus(req: Request, res: Response) {
+  try {
+    const { repoId } = req.params;
+    const repoName = resolveRepo(repoId);
+    
+    const status = await getGitStatus(repoName);
+    return res.json({ success: true, data: status });
+  } catch (err: any) {
+    console.error(`❌ [DevFlow] Git status error for ${req.params.repoId}:`, err.message);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+// POST /api/devflow/repos/:repoId/git/action
+export async function executeGitAction(req: Request, res: Response) {
+  try {
+    const { repoId } = req.params;
+    const { action } = req.body;
+    const repoName = resolveRepo(repoId);
+
+    let result;
+    switch (action) {
+      case 'fetch':
+        result = await gitFetch(repoName);
+        break;
+      case 'pull':
+        result = await gitPull(repoName);
+        break;
+      case 'push':
+        result = await gitPush(repoName);
+        break;
+      default:
+        return res.status(400).json({ error: 'Invalid git action. Must be fetch, pull, or push.' });
+    }
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Git command failed', output: result.output });
+    }
+
+    return res.json({ success: true, message: `Git ${action} successful`, output: result.output });
+  } catch (err: any) {
+    console.error(`❌ [DevFlow] Git action error:`, err.message);
+    return res.status(500).json({ error: err.message });
   }
 }

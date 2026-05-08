@@ -9,6 +9,20 @@ const SERVICES = [
   { name: 'user-service', language: 'Python', repoUrl: 'https://github.com/devlens/user-service' },
   { name: 'api-gateway', language: 'Node.js', repoUrl: 'https://github.com/devlens/api-gateway' },
   { name: 'notification-service', language: 'Node.js', repoUrl: 'https://github.com/devlens/notification-service' },
+  { name: 'inventory-worker', language: 'Rust', repoUrl: 'https://github.com/devlens/inventory-worker' },
+];
+
+const REALISTIC_COMMITS = [
+  'feat: implement mfa with totp support',
+  'fix: postgres connection pool exhaustion under high load',
+  'chore: update dependencies and patch security vulnerabilities',
+  'refactor: migrate from Redux to TanStack Query for state management',
+  'docs: update api reference for v1.2.0 release',
+  'ci: add security scanning to pull request workflow',
+  'security: patch critical buffer overflow in image processor',
+  'feat: add role-based access control for admin dashboard',
+  'fix: resolve race condition in vulnerability scanner worker',
+  'perf: optimize database queries for analytics dashboard',
 ];
 
 const VULNERABILITY_TEMPLATES = [
@@ -24,12 +38,15 @@ const VULNERABILITY_TEMPLATES = [
   { cveId: 'CVE-2022-41409', title: 'PCRE2: integer overflow DoS', severity: 'low', cvssScore: 2.5, affectedPackage: 'pcre2@10.40', fixedVersion: '10.42' },
 ];
 
+const AUTHORS = ['yuvrajgohil24', 'alice.dev', 'bob.ops', 'charlie.sec', 'diana.dev'];
+
 function randomSha(): string {
   return Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
 }
 
-function daysAgo(n: number): Date {
-  return new Date(Date.now() - n * 24 * 3600 * 1000);
+function randomTimeInPast(hoursAgo: number): Date {
+  const jitter = (Math.random() - 0.5) * 2 * 3600 * 1000; // +/- 1 hour
+  return new Date(Date.now() - hoursAgo * 3600 * 1000 + jitter);
 }
 
 function calcScore(c: number, h: number, m: number, l: number): number {
@@ -40,9 +57,10 @@ function calcScore(c: number, h: number, m: number, l: number): number {
 }
 
 async function main() {
-  console.log('🌱 Seeding DevLens database...');
+  console.log('🌱 Seeding DevLens database with REALISTIC data...');
 
-  // Clear existing data
+  // Clear existing data in correct dependency order
+  await prisma.secret.deleteMany();
   await prisma.policyViolation.deleteMany();
   await prisma.riskScore.deleteMany();
   await prisma.vulnerability.deleteMany();
@@ -55,30 +73,32 @@ async function main() {
     const service = await prisma.service.create({ data: svcData });
     console.log(`  ✅ Service: ${service.name}`);
 
-    // Create 4 deployments per service at different times
-    const depConfigs = [
-      { daysAgo: 1, env: 'production', status: 'success', branch: 'main', vulnCount: 6 },
-      { daysAgo: 3, env: 'staging', status: 'success', branch: 'develop', vulnCount: 8 },
-      { daysAgo: 7, env: 'production', status: 'success', branch: 'main', vulnCount: 10 },
-      { daysAgo: 14, env: 'staging', status: 'failed', branch: 'feature/new-auth', vulnCount: 4 },
-    ];
+    // Create 4-6 deployments per service at different times
+    const numDeploys = 4 + Math.floor(Math.random() * 3);
+    
+    for (let i = 0; i < numDeploys; i++) {
+      let sha = randomSha();
+      let msg = REALISTIC_COMMITS[Math.floor(Math.random() * REALISTIC_COMMITS.length)];
+      let hoursAgo = (i + 1) * 12 + Math.floor(Math.random() * 12); // Spread out every 12h-ish
+      let author = AUTHORS[Math.floor(Math.random() * AUTHORS.length)];
+      let branch = i === 0 ? 'main' : (Math.random() > 0.7 ? 'develop' : 'feature/update-security');
+      let env = branch === 'main' ? 'production' : 'staging';
+      let status: 'success' | 'failed' | 'running' = Math.random() > 0.1 ? 'success' : 'failed';
 
-    for (const cfg of depConfigs) {
-      const sha = randomSha();
-      const triggeredAt = daysAgo(cfg.daysAgo);
-      const completedAt = new Date(triggeredAt.getTime() + 3 * 60 * 1000);
+      const triggeredAt = randomTimeInPast(hoursAgo);
+      const completedAt = new Date(triggeredAt.getTime() + (2 + Math.random() * 5) * 60 * 1000);
 
       const deployment = await prisma.deployment.create({
         data: {
           serviceId: service.id,
           commitSha: sha,
-          commitMessage: `deploy: ${cfg.branch} to ${cfg.env}`,
-          branch: cfg.branch,
-          author: ['yuvraj.singh', 'alice.dev', 'bob.ops'][Math.floor(Math.random() * 3)],
-          status: cfg.status,
-          environment: cfg.env,
+          commitMessage: msg,
+          branch,
+          author,
+          status,
+          environment: env,
           triggeredAt,
-          completedAt,
+          completedAt: status === 'success' ? completedAt : null,
           pipelineUrl: `https://github.com/devlens/${service.name}/actions/runs/${Math.floor(Math.random() * 9999999)}`,
         },
       });
@@ -95,9 +115,14 @@ async function main() {
         },
       });
 
-      // Add vulnerabilities (subset of templates)
-      const vulnSubset = VULNERABILITY_TEMPLATES.slice(0, cfg.vulnCount);
-      for (const v of vulnSubset) {
+      // Add random vulnerabilities
+      const vulnCount = Math.floor(Math.random() * 8);
+      const shuffled = [...VULNERABILITY_TEMPLATES].sort(() => 0.5 - Math.random());
+      const selectedVulns = shuffled.slice(0, vulnCount);
+
+      let c = 0, h = 0, m = 0, l = 0;
+
+      for (const v of selectedVulns) {
         await prisma.vulnerability.create({
           data: {
             scanId: scan.id,
@@ -105,26 +130,20 @@ async function main() {
             serviceId: service.id,
             cveId: v.cveId,
             title: v.title,
-            severity: v.severity,
+            severity: v.severity as any,
             cvssScore: v.cvssScore,
             affectedPackage: v.affectedPackage,
             fixedVersion: v.fixedVersion,
             scannerSource: 'trivy',
-            isResolved: Math.random() > 0.7,
+            isResolved: Math.random() > 0.6,
             detectedAt: triggeredAt,
           },
         });
+        if (v.severity === 'critical') c++;
+        else if (v.severity === 'high') h++;
+        else if (v.severity === 'medium') m++;
+        else if (v.severity === 'low') l++;
       }
-
-      // Calculate and store risk score
-      const severityCounts = vulnSubset.reduce(
-        (acc, v) => { acc[v.severity] = (acc[v.severity] || 0) + 1; return acc; },
-        {} as Record<string, number>
-      );
-      const c = severityCounts['critical'] || 0;
-      const h = severityCounts['high'] || 0;
-      const m = severityCounts['medium'] || 0;
-      const l = severityCounts['low'] || 0;
 
       await prisma.riskScore.create({
         data: {
@@ -138,33 +157,22 @@ async function main() {
           calculatedAt: completedAt,
         },
       });
-    }
 
-    // Add policy violations to some services
-    if (['auth-api', 'api-gateway'].includes(service.name)) {
-      const dep = await prisma.deployment.findFirst({ where: { serviceId: service.id } });
-      if (dep) {
-        await prisma.policyViolation.createMany({
-          data: [
-            {
-              deploymentId: dep.id,
-              serviceId: service.id,
-              violationType: 'secret_detected',
-              severity: 'critical',
-              detail: 'Hardcoded API key detected in environment variables: STRIPE_SECRET_KEY',
-              isResolved: false,
-              detectedAt: daysAgo(1),
-            },
-            {
-              deploymentId: dep.id,
-              serviceId: service.id,
-              violationType: 'unsigned_image',
-              severity: 'high',
-              detail: 'Docker image is not signed with Cosign — cannot verify image integrity',
-              isResolved: false,
-              detectedAt: daysAgo(2),
-            },
-          ],
+      // Occasionally add a secret or violation
+      if (Math.random() > 0.8) {
+        await prisma.secret.create({
+          data: {
+            scanId: scan.id,
+            serviceId: service.id,
+            deploymentId: deployment.id,
+            type: 'AWS Access Key',
+            source: 'git history',
+            file: 'src/config.js',
+            line: 42,
+            commitSha: sha,
+            isVerified: true,
+            detectedAt: triggeredAt,
+          }
         });
       }
     }
@@ -173,7 +181,7 @@ async function main() {
   const count = await prisma.deployment.count();
   const vulnCount = await prisma.vulnerability.count();
   const riskCount = await prisma.riskScore.count();
-  console.log(`\n✅ Seed complete:`);
+  console.log(`\n✅ Realistic Seed complete:`);
   console.log(`   Services: ${SERVICES.length}`);
   console.log(`   Deployments: ${count}`);
   console.log(`   Vulnerabilities: ${vulnCount}`);

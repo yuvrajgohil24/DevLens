@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { runTrivy, parseTrivyOutput } from '../scanners/trivy';
 import { runTruffleHog, parseTruffleHogOutput } from '../scanners/truffleHog';
+import { runSnyk, parseSnykOutput } from '../scanners/snyk';
 import { createScan, completeScan, failScan, insertVulnerabilities, insertSecrets } from '../services/scanService';
 import { calculateRiskScore } from '../services/riskScoreService';
 import { updateDeploymentStatus } from '../services/deploymentService';
@@ -11,8 +12,7 @@ import { sendSlackAlert } from '../services/slackService';
 import prisma from '../db/prisma';
 import path from 'path';
 import os from 'os';
-
-
+import { sendSlackAlert } from '../services/slackService';
 interface ScanJobData {
   deployment_id: string;
   service_id: string;
@@ -37,6 +37,7 @@ const worker = new Worker<ScanJobData>(
     // 1. Create scan records
     const trivyScan = await createScan(deployment_id, 'trivy');
     const truffleScan = await createScan(deployment_id, 'trufflehog');
+    const snykScan = await createScan(deployment_id, 'snyk');
 
     try {
       // 2. Update deployment to running
@@ -61,11 +62,22 @@ const worker = new Worker<ScanJobData>(
         
         // --- TRIVY (CVEs) ---
         const trivyOutput = await runTrivy(scanTargetPath);
-        const parsedVulns = parseTrivyOutput(trivyOutput);
+        const parsedTrivyVulns = parseTrivyOutput(trivyOutput);
         await insertVulnerabilities(
-          parsedVulns.map(v => ({ ...v, scanId: trivyScan.id, deploymentId: deployment_id, serviceId: service_id }))
+          parsedTrivyVulns.map(v => ({ ...v, scanId: trivyScan.id, deploymentId: deployment_id, serviceId: service_id }))
         );
         await completeScan(trivyScan.id, trivyOutput);
+
+        // --- SNYK (SCA) ---
+        const snykOutput = await runSnyk(scanTargetPath);
+        const parsedSnykVulns = parseSnykOutput(snykOutput);
+        await insertVulnerabilities(
+          parsedSnykVulns.map(v => ({ ...v, scanId: snykScan.id, deploymentId: deployment_id, serviceId: service_id }))
+        );
+        await completeScan(snykScan.id, snykOutput);
+
+        // Combine vulnerabilities
+        const parsedVulns = [...parsedTrivyVulns, ...parsedSnykVulns];
 
         // --- TRUFFLEHOG (Secrets) ---
         const truffleOutput = await runTruffleHog(scanTargetPath);
@@ -108,8 +120,29 @@ const worker = new Worker<ScanJobData>(
 
         if (finalStatus === 'failed') {
           console.warn(`🛑 [POLICY FAIL] ${failureReason}`);
+          await sendSlackAlert({
+            title: `🚨 Security Alert: ${service_name}`,
+            message: failureReason,
+            level: 'critical',
+            details: {
+              'Deployment ID': deployment_id,
+              'Risk Score': riskScore.score.toString(),
+              'Critical CVEs': criticalCveCount.toString(),
+              'Exposed Secrets': secretCount.toString(),
+            }
+          });
         } else {
           console.log(`✅ [POLICY PASS] Deployment successful for ${service_name}`);
+          await sendSlackAlert({
+            title: `✅ Security Scan Passed: ${service_name}`,
+            message: `Deployment verified. No critical vulnerabilities or leaked secrets detected.`,
+            level: 'info',
+            details: {
+              'Deployment ID': deployment_id,
+              'Risk Score': riskScore.score.toString(),
+              'Total CVEs': parsedVulns.length.toString()
+            }
+          });
         }
 
         // 9. Send Slack Alert
@@ -127,10 +160,27 @@ const worker = new Worker<ScanJobData>(
       } finally {
         if (isTemp) await cleanupDirectory(scanTargetPath);
       }
-    } catch (err) {
+    } catch (err: any) {
       await failScan(trivyScan.id, String(err));
       await failScan(truffleScan.id, String(err));
+      await failScan(snykScan.id, String(err));
       await updateDeploymentStatus(deployment_id, 'failed', new Date());
+
+      // Notify Slack about system failure
+      try {
+        await sendSlackAlert({
+          title: `❌ Scanner System Error: ${service_name}`,
+          message: `Security pipeline failed to execute: ${err.message || 'Unknown error during scan execution.'}`,
+          level: 'critical',
+          details: {
+            'Deployment ID': deployment_id,
+            'Job ID': job.id || 'unknown'
+          }
+        });
+      } catch (slackErr) {
+        console.error('Failed to send error alert to Slack:', slackErr);
+      }
+
       throw err;
     }
   },
