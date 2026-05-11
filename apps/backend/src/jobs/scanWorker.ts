@@ -35,9 +35,15 @@ const worker = new Worker<ScanJobData>(
     const { deployment_id, service_id, service_name, image_name, repo_url, environment } = job.data;
     console.log(`\n🔬 Starting scan job [${job.id}] for ${image_name}`);
 
+    // 0. Idempotency: Clean up any partial scans/data if this job is a retry
+    await prisma.vulnerability.deleteMany({ where: { deploymentId: deployment_id } });
+    await prisma.secret.deleteMany({ where: { deploymentId: deployment_id } });
+    await prisma.scan.deleteMany({ where: { deploymentId: deployment_id } });
+
     // 1. Create scan records
     const trivyScan = await createScan(deployment_id, 'trivy');
     const truffleScan = await createScan(deployment_id, 'trufflehog');
+    const snykScan = await createScan(deployment_id, 'snyk');
     const snykScan = await createScan(deployment_id, 'snyk');
 
     try {
