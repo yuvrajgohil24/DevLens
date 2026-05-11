@@ -13,7 +13,7 @@
     "db:seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@clerk/clerk-sdk-node": "^4.13.23",
+    "@clerk/clerk-sdk-node": "^5.1.6",
     "@prisma/client": "^5.11.0",
     "axios": "^1.6.8",
     "bullmq": "^5.4.2",
