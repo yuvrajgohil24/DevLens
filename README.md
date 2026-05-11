@@ -35,6 +35,25 @@ In modern DevOps, security is often an afterthought or buried in complex logs. *
 
 ---
 
+## 🎬 Demo
+
+> **Local setup requires PostgreSQL 16 + Redis 7.** For a zero-config preview, use the Docker Compose route below.
+
+### 🐳 One-Command Setup (No Local DB/Redis Required)
+```bash
+docker-compose up
+# Frontend → http://localhost:3000  |  Backend → http://localhost:4000
+```
+Docker Compose boots the full stack with a pre-seeded database. No PostgreSQL or Redis configuration required.
+
+### 📸 Dashboard Screenshots
+
+| **Live Dashboard** | **Vulnerability Analysis** | **Git Flow** |
+|:---:|:---:|:---:|
+| ![Dashboard](assets/dashboard.png) | ![Vulnerabilities](assets/vulnerabilities.png) | ![DevFlow](assets/devflow.png) |
+
+---
+
 ## 🌟 Key Features
 
 -   **🚀 Live Pipeline Tracking**: Real-time visualization of GitHub Actions workflows via Webhooks.
@@ -96,7 +115,15 @@ npm run setup
 npm run dev
 ```
 
+### 3. Running Tests
+```bash
+cd apps/backend
+npm test
+# 12 unit tests, zero infrastructure required (no DB / Redis)
+```
+
 ---
+
 
 ## 📡 API Hub
 
@@ -112,6 +139,6 @@ npm run dev
 ## 🗺️ Roadmap
 
 - [x] **Phase 1**: Core Live Dashboard & Mock Pipelines
-- [x] **Phase 2**: Real-time Trivy & TruffleHog Integration
-- [ ] **Phase 3**: Slack/Email Alerts & Managed Cloud Deployment
+- [x] **Phase 2**: Real-time Trivy & TruffleHog Integration + Basic Test Suite
+- [ ] **Phase 3**: Snyk CLI Integration, Slack/Email Alerts & Managed Cloud Deployment
 - [ ] **Phase 4**: Managed Infrastructure (Kubernetes/Docker)

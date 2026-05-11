@@ -1,12 +1,18 @@
+// Phase 3: Real Snyk CLI integration is planned for Phase 3 (Managed Cloud Deployment).
+// Until then, this scanner returns hardcoded mock data so the scan pipeline
+// remains exercisable end-to-end without a Snyk token / CLI binary.
 import { NormalizedVulnerability } from './trivy';
 
+// Mock - Phase 3: Replace this function body with real Snyk CLI execution, e.g.:
+//   const { stdout } = await execAsync(`snyk test --json "${targetPath}"`);
+//   return JSON.parse(stdout);
 export async function runSnyk(targetPath: string): Promise<unknown> {
-  console.log(`🔍 [SNYK] Running simulated SCA scan on: ${targetPath}`);
+  console.log(`🔍 [SNYK] Running simulated SCA scan on: ${targetPath} (Mock - Phase 3)`);
   
-  // Simulate scanning delay
+  // Mock - Phase 3: Simulated delay mimics real Snyk CLI execution time
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // Return mocked Snyk JSON output
+  // Mock - Phase 3: Hardcoded vulnerability data — replace with real snyk JSON output
   return {
     vulnerabilities: [
       {

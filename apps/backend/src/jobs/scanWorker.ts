@@ -69,7 +69,8 @@ const worker = new Worker<ScanJobData>(
         );
         await completeScan(trivyScan.id, trivyOutput);
 
-        // --- SNYK (SCA) ---
+        // --- SNYK (SCA) — Mock - Phase 3 ---
+        // runSnyk() returns hardcoded mock data until Phase 3 Snyk CLI integration.
         const snykOutput = await runSnyk(scanTargetPath);
         const parsedSnykVulns = parseSnykOutput(snykOutput);
         await insertVulnerabilities(
