@@ -1,31 +1,24 @@
 # 🛡️ DevLens — Unified Developer Platform
 
+> [!IMPORTANT]
+> **Deployment Test**: Verifying the GitHub Webhook connection and **Slack Notifications** on `deploy-testing` branch.
+
 > **Build with Confidence. Deploy with Security. Monitor in Real-time.**
 
-DevLens is a comprehensive dashboard designed to unify code movements, security postures, and deployment pipelines into a single, beautiful interface.
+## Architecture
 
----
-
-## 📖 Essential Documentation
-
-Neeche diye gaye link par click karke project ki detailed working samajhein:
-👉 **[PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md)** (What, Why, and How explained)
-
----
-
-## 🏗️ System Architecture
-
-```mermaid
-graph LR
-    A[GitHub Push] --> B[CI/CD Pipeline]
-    B --> C[DevLens Webhook]
-    C --> D[(PostgreSQL)]
-    C --> E[Redis Queue]
-    E --> F[Scanner Worker]
-    F --> G[Trivy / TruffleHog]
-    G --> D
-    D --> H[Socket.io]
-    H --> I[Live Dashboard]
+```
+GitHub Push → GitHub Actions → POST /api/webhooks/pipeline
+                                    ↓
+                              PostgreSQL (deployment record)
+                                    ↓
+                              Redis BullMQ (scan job)
+                                    ↓
+                              Trivy scanner (mock → real in Phase 2)
+                                    ↓
+                              CVE records + Risk Score
+                                    ↓
+                              Socket.io → Dashboard live update
 ```
 
 ## 🚀 Quick Start

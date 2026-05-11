@@ -2,7 +2,7 @@ name: DevLens CI — Self Monitoring
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, deploy-testing]
   workflow_dispatch:
 
 jobs:
@@ -23,8 +23,10 @@ jobs:
         if: env.WEBHOOK_URL != ''
         continue-on-error: true
         run: |
-          curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
+          curl -v --max-time 60 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
+            -H "Bypass-Tunnel-Reminder: true" \
+            -H "ngrok-skip-browser-warning: true" \
             -d '{
               "commit_sha":      "${{ github.sha }}",
               "service_name":    "devlens",
@@ -51,8 +53,10 @@ jobs:
         if: success() && env.WEBHOOK_URL != ''
         continue-on-error: true
         run: |
-          curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
+          curl -v --max-time 60 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
+            -H "Bypass-Tunnel-Reminder: true" \
+            -H "ngrok-skip-browser-warning: true" \
             -d '{
               "commit_sha": "${{ github.sha }}",
               "service_name": "devlens",
@@ -67,8 +71,10 @@ jobs:
         if: failure() && env.WEBHOOK_URL != ''
         continue-on-error: true
         run: |
-          curl -s -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
+          curl -v --max-time 60 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
             -H "Content-Type: application/json" \
+            -H "Bypass-Tunnel-Reminder: true" \
+            -H "ngrok-skip-browser-warning: true" \
             -d '{
               "commit_sha": "${{ github.sha }}",
               "service_name": "devlens",

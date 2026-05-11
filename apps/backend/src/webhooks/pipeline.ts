@@ -56,13 +56,18 @@ export async function handlePipelineWebhook(req: Request, res: Response) {
     });
     console.log(`🚀 Deployment created: ${deployment.id.slice(0, 8)} [${environment}]`);
 
-    // 4. Enqueue scan job
+    // 4. Enqueue scan job with full context
     await scanQueue.add('trivy-scan', {
       deployment_id: deployment.id,
       service_id: service.id,
       service_name,
       repo_url,
       image_name: `${service_name}:${commit_sha.slice(0, 7)}`,
+      commit_sha,
+      branch,
+      author,
+      environment,
+      pipeline_url,
     });
     console.log(`📋 Scan enqueued for deployment ${deployment.id.slice(0, 8)}`);
 

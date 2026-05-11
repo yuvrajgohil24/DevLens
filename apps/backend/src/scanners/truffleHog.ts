@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+import { pathToFileURL } from 'url';
 
 const execAsync = promisify(exec);
 
@@ -21,9 +22,8 @@ export async function runTruffleHog(repoPath: string): Promise<string> {
   // Use the absolute path to our newly installed TruffleHog
   const truffleHogBin = path.resolve(process.cwd(), 'bin', 'trufflehog.exe');
   
-  // We bypass Windows URI parsing issues by setting the execution directory
-  // and scanning the current relative directory representing the git repository.
-  const command = `"${truffleHogBin}" git "file://." --json --no-update`;
+  // Use the absolute path directly for local git scanning
+  const command = `"${truffleHogBin}" git "${repoPath}" --json --no-update`;
   
   console.log(`🔍 [TRUFFLEHOG] Scanning full git history: ${command} in ${repoPath}`);
   

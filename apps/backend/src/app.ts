@@ -11,11 +11,11 @@ import { listVulnerabilities, resolveVulnerability } from './api/vulnerabilities
 import { listServices, getService, getServiceRiskHistory } from './api/services';
 import { listPolicyViolations, resolvePolicyViolation } from './api/policyViolations';
 import {
+  getRepos,
   getBranches,
   getCommits,
   triggerDeploy,
   getDeploymentStatus,
-  getRepos,
   getLocalGitStatus,
   executeGitAction,
 } from './api/devflow';
