@@ -44,8 +44,6 @@ const worker = new Worker<ScanJobData>(
     const trivyScan = await createScan(deployment_id, 'trivy');
     const truffleScan = await createScan(deployment_id, 'trufflehog');
     const snykScan = await createScan(deployment_id, 'snyk');
-    const snykScan = await createScan(deployment_id, 'snyk');
-
     try {
       // 2. Update deployment to running
       await updateDeploymentStatus(deployment_id, 'running');
