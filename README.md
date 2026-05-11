@@ -1,60 +1,62 @@
 # 🛡️ DevLens — Unified Developer Platform
 
-> [!IMPORTANT]
-> **Deployment Test**: Verifying the GitHub Webhook connection and **Slack Notifications** on `deploy-testing` branch.
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge&logo=vercel)](https://devlens-demo.vercel.app/)
 
 > **Build with Confidence. Deploy with Security. Monitor in Real-time.**
 
-## Architecture
+![DevLens Real Dashboard](assets/dashboard.png)
 
-```
-GitHub Push → GitHub Actions → POST /api/webhooks/pipeline
-                                    ↓
-                              PostgreSQL (deployment record)
-                                    ↓
-                              Redis BullMQ (scan job)
-                                    ↓
-                              Trivy scanner (mock → real in Phase 2)
-                                    ↓
-                              CVE records + Risk Score
-                                    ↓
-                              Socket.io → Dashboard live update
-```
+## ✨ Overview
 
-## 🚀 Quick Start
+DevLens is a comprehensive developer platform designed to bridge the gap between development and security. It provides real-time visibility into your deployment pipeline, automated security scanning (SCA/SAST), and proactive risk management—all in a single, intuitive dashboard.
 
-### Prerequisites
-- **Node.js 20+**
-- **npm 10+**
-- **PostgreSQL 16** — `winget install -e --id PostgreSQL.PostgreSQL.16`
-- **Redis (Windows)** — `winget install -e --id Redis.Redis`
+---
 
-> **Note:** Docker-based setup is planned for a future release to enable one-command startup and easier cross-platform portability.
+## ❓ Why DevLens?
 
-### 1. Zero to Hero Setup
-```bash
-# 1. Install PostgreSQL 16 (wizard will open — set password to: devlens)
-winget install -e --id PostgreSQL.PostgreSQL.16
+In modern DevOps, security is often an afterthought or buried in complex logs. **DevLens** changes that by making security "visible" and "actionable":
 
-# 2. Install Redis for Windows (installs as Windows Service on port 6379)
-winget install -e --id Redis.Redis
+-   **Stop "Flying Blind"**: Get instant visual confirmation of every push and its security posture.
+-   **Security at Speed**: Don't wait for weekly reports. See vulnerabilities the moment they hit your pipeline.
+-   **Consolidated Intelligence**: No more jumping between GitHub, Trivy CLI, and monitoring tools. Everything is in one place.
+-   **Developer-First**: Built with a clean, high-performance UI that developers actually enjoy using.
 
-# 3. Create the devlens DB user (run in psql as postgres superuser)
-# CREATE USER devlens WITH PASSWORD 'devlens';
-# CREATE DATABASE devlens OWNER devlens;
-# GRANT ALL PRIVILEGES ON DATABASE devlens TO devlens;
+---
 
-# 4. Install dependencies + push schema + seed
-npm run setup
-```
+## 📸 Dashboard Preview
 
-### 2. Launching the Platform
-```bash
-# Terminal 1 — Backend (Port 4000)
-cd apps/backend && npm run dev
+| **Vulnerability Analysis** | **Git Flow & Deployments** |
+|:---:|:---:|
+| ![Vulnerabilities](assets/vulnerabilities.png) | ![DevFlow](assets/devflow.png) |
 
-# Terminal 2 — Frontend (Port 3000)
-cd apps/frontend && npm run dev
+---
+
+## 🌟 Key Features
+
+-   **🚀 Live Pipeline Tracking**: Real-time visualization of GitHub Actions workflows via Webhooks.
+-   **🔍 Automated Security Scanning**: Integrated **Aqua Security Trivy** and **TruffleHog** for vulnerability and secret detection.
+-   **📊 Smart Risk Scoring**: Dynamic CVE analysis and risk categorization (Low, Medium, High, Critical).
+-   **⚡ Real-time Updates**: Powered by **Socket.io** for instant dashboard notifications without refreshes.
+-   **🔔 Proactive Alerts**: (Phase 3) Automated Slack and Email notifications for critical security findings.
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    A[GitHub Push] --> B[GitHub Actions]
+    B -->|Webhook| C[DevLens API]
+    C --> D[(PostgreSQL)]
+    C --> E[Redis BullMQ]
+    E --> F[Trivy/TruffleHog Scanner]
+    F --> G[CVE Records & Risk Score]
+    G --> H[Socket.io]
+    H --> I[Live Dashboard]
 ```
 
 ---
@@ -67,6 +69,32 @@ cd apps/frontend && npm run dev
 | **Backend** | Express 5, TypeScript, Socket.io, BullMQ |
 | **Data** | Prisma ORM, PostgreSQL 16, Redis 7 |
 | **Security** | Aqua Security Trivy, TruffleHog |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js 20+**
+- **npm 10+**
+- **PostgreSQL 16**
+- **Redis (Windows/Linux)**
+
+### 1. Setup & Installation
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/devlens.git
+cd devlens
+
+# Install dependencies, push schema, and seed data
+npm run setup
+```
+
+### 2. Launching the Platform
+```bash
+# Start both Backend & Frontend concurrently
+npm run dev
+```
 
 ---
 
@@ -86,3 +114,4 @@ cd apps/frontend && npm run dev
 - [x] **Phase 1**: Core Live Dashboard & Mock Pipelines
 - [x] **Phase 2**: Real-time Trivy & TruffleHog Integration
 - [ ] **Phase 3**: Slack/Email Alerts & Managed Cloud Deployment
+- [ ] **Phase 4**: Managed Infrastructure (Kubernetes/Docker)
