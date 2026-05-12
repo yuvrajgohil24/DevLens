@@ -1,4 +1,8 @@
 import 'dotenv/config';
+/**
+ * DevLens Backend - Main Application Entry
+ * Triggered by: Smart CI Pipeline Test
+ */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
