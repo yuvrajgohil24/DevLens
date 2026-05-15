@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
+// In production (Railway), env vars are injected directly — .env file won't exist
+// dotenv will silently skip if file not found
 dotenv.config({ path: path.join(__dirname, '../.env') });
 import http from 'http';
 import app from './app';

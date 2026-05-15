@@ -87,12 +87,18 @@ export async function triggerDeploy(req: Request, res: Response) {
       pipelineUrl: `https://github.com/${owner}/${repoName}/commit/${finalSha}`,
     });
 
-    // Enqueue security scan
+    // Enqueue security scan — pass repo_url so worker clones the remote repo
     await scanQueue.add('trivy-scan', {
       deployment_id: deployment.id,
       service_id: service.id,
       service_name: repoId,
       image_name: `${repoName}:${finalSha.slice(0, 7)}`,
+      repo_url: `https://github.com/${owner}/${repoName}.git`,
+      commit_sha: finalSha,
+      branch,
+      author: 'devflow-ui',
+      environment,
+      pipeline_url: `https://github.com/${owner}/${repoName}/commit/${finalSha}`,
     });
 
     try {

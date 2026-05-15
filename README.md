@@ -4,7 +4,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge&logo=vercel)](https://devlens-demo.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-yuvrajgohil24-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/yuvrajgohil24/DevLens)
 
 > **Build with Confidence. Deploy with Security. Monitor in Real-time.**
 
@@ -60,7 +60,7 @@ Docker Compose boots the full stack with a pre-seeded database. No PostgreSQL or
 -   **🔍 Automated Security Scanning**: Integrated **Aqua Security Trivy** and **TruffleHog** for vulnerability and secret detection.
 -   **📊 Smart Risk Scoring**: Dynamic CVE analysis and risk categorization (Low, Medium, High, Critical).
 -   **⚡ Real-time Updates**: Powered by **Socket.io** for instant dashboard notifications without refreshes.
--   **🔔 Proactive Alerts**: (Phase 3) Automated Slack and Email notifications for critical security findings.
+-   **🔔 Proactive Alerts**: Automated **Slack** notifications for critical security findings — fires on every scan completion.
 
 ---
 
@@ -102,8 +102,8 @@ graph TD
 ### 1. Setup & Installation
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/devlens.git
-cd devlens
+git clone https://github.com/yuvrajgohil24/DevLens.git
+cd DevLens
 
 # Install dependencies, push schema, and seed data
 npm run setup
@@ -139,6 +139,6 @@ npm test
 ## 🗺️ Roadmap
 
 - [x] **Phase 1**: Core Live Dashboard & Mock Pipelines
-- [x] **Phase 2**: Real-time Trivy & TruffleHog Integration + Basic Test Suite
-- [ ] **Phase 3**: Snyk CLI Integration, Slack/Email Alerts & Managed Cloud Deployment
-- [ ] **Phase 4**: Managed Infrastructure (Kubernetes/Docker)
+- [x] **Phase 2**: Real-time Trivy, TruffleHog & Snyk Integration + Slack Alerts + Basic Test Suite
+- [ ] **Phase 3**: Authentication (Clerk), Cloud Deployment (Railway/Render) & Email Notifications
+- [ ] **Phase 4**: Managed Infrastructure (Kubernetes / Helm Charts)
