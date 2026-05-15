@@ -22,10 +22,18 @@ jobs:
       - name: Detect Changed Service
         id: filter
         run: |
-          if git diff --name-only HEAD^ HEAD | grep -q "^apps/backend/"; then
+          # Safely get changed files — handles shallow clones and first commits
+          if git log --oneline -2 | wc -l | grep -q "^1$"; then
+            CHANGED=$(git diff-tree --no-commit-id -r --name-only HEAD)
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff-tree --no-commit-id -r --name-only HEAD)
+          fi
+          echo "Changed files: $CHANGED"
+          
+          if echo "$CHANGED" | grep -q "^apps/backend/"; then
             echo "service=backend" >> $GITHUB_OUTPUT
             echo "lang=Node.js" >> $GITHUB_OUTPUT
-          elif git diff --name-only HEAD^ HEAD | grep -q "^apps/frontend/"; then
+          elif echo "$CHANGED" | grep -q "^apps/frontend/"; then
             echo "service=frontend" >> $GITHUB_OUTPUT
             echo "lang=Next.js" >> $GITHUB_OUTPUT
           else
