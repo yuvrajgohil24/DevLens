@@ -31,7 +31,16 @@ export async function runTruffleHog(repoPath: string): Promise<string> {
     gitUri = repoPath;
   } else {
     // Local path — convert Windows backslashes to file:// URI
-    gitUri = pathToFileURL(repoPath).href; // e.g. file:///C:/Users/acer/AppData/...
+    // FIX for TruffleHog Windows bug: pathToFileURL generates file:///C:/...
+    // but TruffleHog misreads it as file://C:/C:/... 
+    // We must manually format it to file://C:/...
+    const normalizedPath = repoPath.replace(/\\/g, '/');
+    gitUri = normalizedPath.startsWith('/') ? \`file://\${normalizedPath}\` : \`file:///\${normalizedPath}\`;
+    
+    // Windows specific hack for TruffleHog: if it starts with file:///C:/, change to file://C:/
+    if (process.platform === 'win32' && gitUri.match(/^file:\/\/\/[a-zA-Z]:\//)) {
+      gitUri = gitUri.replace(/^file:\/\/\//, 'file://');
+    }
   }
 
   // Added --no-verification so it doesn't filter out our fake test secrets
