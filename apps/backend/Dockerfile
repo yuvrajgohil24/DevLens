@@ -1,10 +1,13 @@
 # ── Stage 1: Builder ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+# node:20-slim = Debian-based — has OpenSSL pre-installed (Alpine/musl breaks Prisma)
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
+# Install openssl for Prisma generate
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+
 # Copy package files and install ALL deps (dev included — needed for tsc + prisma)
-# Using npm install instead of npm ci: no package-lock.json in this monorepo subfolder
 COPY package.json ./
 RUN npm install
 
@@ -16,15 +19,16 @@ RUN npx prisma generate --schema=prisma/schema.prisma
 RUN npm run build
 
 # ── Stage 2: Production ───────────────────────────────────────────────────────
-FROM node:20-alpine AS production
+# Must also be slim/Debian so Prisma query engine binary works at runtime
+FROM node:20-slim AS production
 
-# Install system dependencies needed by Trivy + TruffleHog + git clone
-RUN apk add --no-cache \
+# Install OpenSSL + curl + git for Trivy/TruffleHog + scanning
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
     curl \
     git \
-    bash \
     ca-certificates \
-    && update-ca-certificates
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Trivy (CVE scanner)
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
