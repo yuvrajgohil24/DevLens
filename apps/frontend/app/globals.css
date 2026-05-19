@@ -38,8 +38,9 @@
   --radius: 4px; /* Even sharper corners */
 
   /* Font Aliases */
-  --font-heading: 'Syne', sans-serif;
-  --font-mono: 'DM Mono', monospace;
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 
   /* shadcn tokens */
   --foreground: 255 255 255;
@@ -64,7 +65,7 @@ html, body {
   height: 100%;
   background-color: var(--background);
   color: var(--text-primary);
-  font-family: var(--font-mono); /* Default to mono for labels/meta */
+  font-family: var(--font-sans); /* Use professional sans-serif as default */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -79,7 +80,7 @@ html, body {
 h1, h2, h3, h4 {
   font-family: var(--font-heading);
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.025em; /* sleek tighter spacing */
 }
 
 /* ── Precise Card ─────────────────────────────────────────── */
@@ -126,7 +127,7 @@ h1, h2, h3, h4 {
 .count-up { animation: count-up 0.5s ease forwards; }
 
 /* ── Mono font for code/hashes ──────────────────────────── */
-.font-mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+.font-mono { font-family: var(--font-mono); }
 
 /* ── Shimmer skeleton ───────────────────────────────────── */
 @keyframes shimmer {

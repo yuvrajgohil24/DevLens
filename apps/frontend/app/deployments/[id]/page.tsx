@@ -22,7 +22,7 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ id:
   if (!dep) return <div style={{ padding:40, color:'var(--critical)' }}>Deployment not found.</div>;
 
   const risk = dep.riskScores?.[0]?.score;
-  const scansList = (dep as { scans?: { id:string; scannerType:string; status:string; vulnerabilities:{severity:string;cveId:string;title:string;cvssScore:number|null;affectedPackage:string|null}[] }[] }).scans ?? [];
+  const scansList = (dep as { scans?: { id:string; scannerType:string; status:string; vulnerabilities:{severity:string;cveId:string;title:string;cvssScore:number|null;affectedPackage:string|null}[], secrets:{type:string;file:string|null;line:number|null;isVerified:boolean}[] }[] }).scans ?? [];
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
@@ -82,7 +82,7 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ id:
             <Shield size={14} color="var(--primary)" />
             <span style={{ fontWeight:600, fontSize:'0.875rem' }}>{scan.scannerType?.toUpperCase()} Scan</span>
             <StatusBadge status={scan.status} />
-            <span style={{ fontSize:'0.78rem', color:'var(--text-muted)', marginLeft:'auto' }}>{scan.vulnerabilities?.length ?? 0} findings</span>
+            <span style={{ fontSize:'0.78rem', color:'var(--text-muted)', marginLeft:'auto' }}>{(scan.vulnerabilities?.length ?? 0) + (scan.secrets?.length ?? 0)} findings</span>
           </div>
           {scan.vulnerabilities?.length > 0 && (
             <table style={{ width:'100%', borderCollapse:'collapse' }} className="devlens-table">
@@ -101,6 +101,34 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ id:
                     <td><SeverityBadge severity={v.severity} /></td>
                     <td><span className="font-mono" style={{ fontSize:'0.82rem' }}>{Number(v.cvssScore).toFixed(1)}</span></td>
                     <td><span style={{ fontSize:'0.78rem', fontFamily:'monospace', color:'var(--text-secondary)' }}>{v.affectedPackage}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {scan.secrets?.length > 0 && (
+            <table style={{ width:'100%', borderCollapse:'collapse', marginTop: scan.vulnerabilities?.length > 0 ? 16 : 0 }} className="devlens-table">
+              <thead><tr>
+                <th style={{textAlign:'left'}}>Secret Type</th>
+                <th style={{textAlign:'left'}}>File</th>
+                <th style={{textAlign:'left'}}>Line</th>
+                <th style={{textAlign:'left'}}>Status</th>
+              </tr></thead>
+              <tbody>
+                {scan.secrets.map((s, i) => (
+                  <tr key={i}>
+                    <td><span style={{ fontSize:'0.84rem', fontWeight:500, color:'var(--critical)' }}>{s.type}</span></td>
+                    <td><span className="font-mono" style={{ fontSize:'0.78rem' }}>{s.file ?? '—'}</span></td>
+                    <td><span className="font-mono" style={{ fontSize:'0.82rem' }}>{s.line ?? '—'}</span></td>
+                    <td>
+                      <span style={{
+                        fontSize:'0.7rem', padding:'2px 8px', borderRadius:10, textTransform:'uppercase',
+                        backgroundColor: s.isVerified ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
+                        color: s.isVerified ? 'var(--critical)' : '#f59e0b'
+                      }}>
+                        {s.isVerified ? 'Verified' : 'Unverified'}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -60,6 +60,7 @@ export async function getDeploymentById(id: string) {
       scans: {
         include: {
           vulnerabilities: true,
+          secrets: true,
         },
         orderBy: { startedAt: 'desc' },
       },

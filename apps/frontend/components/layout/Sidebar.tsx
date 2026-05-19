@@ -24,23 +24,18 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       {/* Logo */}
-      <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ padding: '20px 20px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 4,
-            background: 'var(--text-primary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Zap size={16} color="#000" strokeWidth={3} />
-          </div>
-          <div>
-            <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '0.95rem', lineHeight: 1.1, color: 'var(--text-primary)', textTransform: 'uppercase' }}>
-              DevLens
-            </div>
-            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 500, letterSpacing: '0.1em' }}>
-              PLATFORM
-            </div>
-          </div>
+          <img 
+            src="/DevLens logo.png" 
+            alt="DevLens Logo" 
+            style={{ 
+              height: 32, 
+              width: 'auto', 
+              objectFit: 'contain',
+              maxWidth: '100%'
+            }} 
+          />
         </div>
       </div>
 

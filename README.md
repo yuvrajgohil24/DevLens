@@ -4,11 +4,12 @@
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
-[![GitHub](https://img.shields.io/badge/GitHub-yuvrajgohil24-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/yuvrajgohil24/DevLens)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge&logo=vercel)](https://devlens-demo.vercel.app/)
+[![CI](https://github.com/yuvrajgohil24/DevLens/actions/workflows/devlens-ci.yml/badge.svg?branch=deploy-testing)](https://github.com/yuvrajgohil24/DevLens/actions/workflows/devlens-ci.yml)
 
 > **Build with Confidence. Deploy with Security. Monitor in Real-time.**
 
-![DevLens Real Dashboard](assets/dashboard.png)
+![DevLens Walkthrough Demo](assets/devlens_walkthrough.webp)
 
 ## ✨ Overview
 
@@ -27,11 +28,15 @@ In modern DevOps, security is often an afterthought or buried in complex logs. *
 
 ---
 
-## 📸 Dashboard Preview
+## 📸 Dashboard Previews
 
-| **Vulnerability Analysis** | **Git Flow & Deployments** |
-|:---:|:---:|
-| ![Vulnerabilities](assets/vulnerabilities.png) | ![DevFlow](assets/devflow.png) |
+| **Live Dashboard** | **Deployments** | **Vulnerability Analysis** |
+|:---:|:---:|:---:|
+| ![Dashboard](assets/Dashboard%202.0.png) | ![Deployments](assets/Deployments%202.0.png) | ![Vulnerabilities](assets/Vulnerabilities%202.0.png) |
+
+| **Services Monitor** | **Git Flow (DevFlow)** | **Policy Violations** |
+|:---:|:---:|:---:|
+| ![Services](assets/Services%202.0.png) | ![DevFlow](assets/DevFlow%202.0.png) | ![Violations](assets/Violations%202.0.png) |
 
 ---
 
@@ -45,12 +50,6 @@ docker-compose up
 # Frontend → http://localhost:3000  |  Backend → http://localhost:4000
 ```
 Docker Compose boots the full stack with a pre-seeded database. No PostgreSQL or Redis configuration required.
-
-### 📸 Dashboard Screenshots
-
-| **Live Dashboard** | **Vulnerability Analysis** | **Git Flow** |
-|:---:|:---:|:---:|
-| ![Dashboard](assets/dashboard.png) | ![Vulnerabilities](assets/vulnerabilities.png) | ![DevFlow](assets/devflow.png) |
 
 ---
 

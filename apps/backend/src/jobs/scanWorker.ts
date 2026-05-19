@@ -56,7 +56,7 @@ const worker = new Worker<ScanJobData>(
         const tempDirName = `devlens-scan-${deployment_id.slice(0, 8)}-${Date.now()}`;
         scanTargetPath = path.join(os.tmpdir(), tempDirName);
         isTemp = true;
-        await cloneRepository(repo_url, scanTargetPath);
+        await cloneRepository(repo_url, scanTargetPath, job.data.branch, job.data.commit_sha);
       } else {
          scanTargetPath = path.resolve(__dirname, '../../../../');
       }
