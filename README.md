@@ -9,7 +9,7 @@
 
 > **Build with Confidence. Deploy with Security. Monitor in Real-time.**
 
-![DevLens Real Dashboard](assets/dashboard.png)
+![DevLens Walkthrough Demo](assets/devlens_walkthrough.webp)
 
 ## ✨ Overview
 
@@ -28,11 +28,15 @@ In modern DevOps, security is often an afterthought or buried in complex logs. *
 
 ---
 
-## 📸 Dashboard Preview
+## 📸 Dashboard Previews
 
-| **Vulnerability Analysis** | **Git Flow & Deployments** |
-|:---:|:---:|
-| ![Vulnerabilities](assets/vulnerabilities.png) | ![DevFlow](assets/devflow.png) |
+| **Live Dashboard** | **Deployments** | **Vulnerability Analysis** |
+|:---:|:---:|:---:|
+| ![Dashboard](assets/Dashboard%202.0.png) | ![Deployments](assets/Deployments%202.0.png) | ![Vulnerabilities](assets/Vulnerabilities%202.0.png) |
+
+| **Services Monitor** | **Git Flow (DevFlow)** | **Policy Violations** |
+|:---:|:---:|:---:|
+| ![Services](assets/Services%202.0.png) | ![DevFlow](assets/DevFlow%202.0.png) | ![Violations](assets/Violations%202.0.png) |
 
 ---
 
@@ -46,12 +50,6 @@ docker-compose up
 # Frontend → http://localhost:3000  |  Backend → http://localhost:4000
 ```
 Docker Compose boots the full stack with a pre-seeded database. No PostgreSQL or Redis configuration required.
-
-### 📸 Dashboard Screenshots
-
-| **Live Dashboard** | **Vulnerability Analysis** | **Git Flow** |
-|:---:|:---:|:---:|
-| ![Dashboard](assets/dashboard.png) | ![Vulnerabilities](assets/vulnerabilities.png) | ![DevFlow](assets/devflow.png) |
 
 ---
 
