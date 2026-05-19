@@ -3,9 +3,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-RUN npm ci --only=production=false
+# Copy package files and install ALL deps (dev included — needed for tsc + prisma)
+# Using npm install instead of npm ci: no package-lock.json in this monorepo subfolder
+COPY package.json ./
+RUN npm install
 
 # Copy source
 COPY . .
@@ -17,7 +18,7 @@ RUN npm run build
 # ── Stage 2: Production ───────────────────────────────────────────────────────
 FROM node:20-alpine AS production
 
-# Install system dependencies needed by Trivy + TruffleHog
+# Install system dependencies needed by Trivy + TruffleHog + git clone
 RUN apk add --no-cache \
     curl \
     git \
@@ -39,7 +40,7 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
-COPY package*.json ./
+COPY package.json ./
 
 # Expose backend port
 EXPOSE 4000
