@@ -1,4 +1,4 @@
-# 🛡️ DevLens — Unified Developer Platform
+# <img src="assets/logo.png" height="32" align="center" /> DevLens — Unified Developer Platform
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
@@ -11,13 +11,13 @@
 
 ![DevLens Walkthrough Demo](assets/devlens_walkthrough.webp)
 
-## ✨ Overview
+## Overview
 
 DevLens is a comprehensive developer platform designed to bridge the gap between development and security. It provides real-time visibility into your deployment pipeline, automated security scanning (SCA/SAST), and proactive risk management—all in a single, intuitive dashboard.
 
 ---
 
-## ❓ Why DevLens?
+## Why DevLens?
 
 In modern DevOps, security is often an afterthought or buried in complex logs. **DevLens** changes that by making security "visible" and "actionable":
 
@@ -28,7 +28,7 @@ In modern DevOps, security is often an afterthought or buried in complex logs. *
 
 ---
 
-## 📸 Dashboard Previews
+## Dashboard Previews
 
 | **Live Dashboard** | **Deployments** | **Vulnerability Analysis** |
 |:---:|:---:|:---:|
@@ -40,11 +40,11 @@ In modern DevOps, security is often an afterthought or buried in complex logs. *
 
 ---
 
-## 🎬 Demo
+## Demo
 
 > **Local setup requires PostgreSQL 16 + Redis 7.** For a zero-config preview, use the Docker Compose route below.
 
-### 🐳 One-Command Setup (No Local DB/Redis Required)
+### One-Command Setup (No Local DB/Redis Required)
 ```bash
 docker-compose up
 # Frontend → http://localhost:3000  |  Backend → http://localhost:4000
@@ -53,17 +53,17 @@ Docker Compose boots the full stack with a pre-seeded database. No PostgreSQL or
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
--   **🚀 Live Pipeline Tracking**: Real-time visualization of GitHub Actions workflows via Webhooks.
--   **🔍 Automated Security Scanning**: Integrated **Aqua Security Trivy** and **TruffleHog** for vulnerability and secret detection.
--   **📊 Smart Risk Scoring**: Dynamic CVE analysis and risk categorization (Low, Medium, High, Critical).
--   **⚡ Real-time Updates**: Powered by **Socket.io** for instant dashboard notifications without refreshes.
--   **🔔 Proactive Alerts**: Automated **Slack** notifications for critical security findings — fires on every scan completion.
+-   **Live Pipeline Tracking**: Real-time visualization of GitHub Actions workflows via Webhooks.
+-   **Automated Security Scanning**: Integrated **Aqua Security Trivy** and **TruffleHog** for vulnerability and secret detection.
+-   **Smart Risk Scoring**: Dynamic CVE analysis and risk categorization (Low, Medium, High, Critical).
+-   **Real-time Updates**: Powered by **Socket.io** for instant dashboard notifications without refreshes.
+-   **Proactive Alerts**: Automated **Slack** notifications for critical security findings — fires on every scan completion.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -79,7 +79,7 @@ graph TD
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -90,7 +90,7 @@ graph TD
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - **Node.js 20+**
@@ -124,7 +124,7 @@ npm test
 ---
 
 
-## 📡 API Hub
+## API Hub
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -135,7 +135,7 @@ npm test
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [x] **Phase 1**: Core Live Dashboard & Mock Pipelines
 - [x] **Phase 2**: Real-time Trivy, TruffleHog & Snyk Integration + Slack Alerts + Basic Test Suite
