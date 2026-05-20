@@ -1,4 +1,7 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+let API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+if (API_BASE.endsWith('/')) {
+  API_BASE = API_BASE.slice(0, -1);
+}
 
 function buildQuery(params?: Record<string, string | number | boolean | undefined | null>): string {
   if (!params) return '';
