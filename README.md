@@ -4,7 +4,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge&logo=vercel)](https://devlens-demo.vercel.app/)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge&logo=vercel)](https://dev-lens-frontend-sable.vercel.app)
 [![CI](https://github.com/yuvrajgohil24/DevLens/actions/workflows/devlens-ci.yml/badge.svg?branch=deploy-testing)](https://github.com/yuvrajgohil24/DevLens/actions/workflows/devlens-ci.yml)
 
 > **Build with Confidence. Deploy with Security. Monitor in Real-time.**
