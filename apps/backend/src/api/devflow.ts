@@ -156,6 +156,11 @@ export async function getLocalGitStatus(req: Request, res: Response) {
     const status = await getGitStatus(repoName);
     return res.json({ success: true, data: status });
   } catch (err: any) {
+    if (err.message && err.message.includes('Repository not found locally')) {
+      // In cloud environments (Render, Railway), local git repos won't exist.
+      // Return 200 instead of 500 to avoid scary frontend errors for a completely expected state.
+      return res.json({ success: false, message: 'Local git features are disabled in cloud environments.' });
+    }
     console.error(`❌ [DevFlow] Git status error for ${req.params.repoId}:`, err.message);
     return res.status(500).json({ error: err.message });
   }
