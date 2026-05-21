@@ -72,7 +72,7 @@ export async function sendSlackAlert(data: SlackAlertData | GenericSlackAlert) {
 
   try {
     await axios.post(webhookUrl, payload);
-    console.log('✅ Slack alert sent successfully');
+    console.log(`✅ Slack alert sent successfully for deployment: ${'serviceName' in data ? data.serviceName : data.title}`);
   } catch (err: any) {
     console.error('❌ Failed to send Slack alert:', err.response?.data || err.message);
   }
