@@ -49,5 +49,5 @@ COPY package.json ./
 # Expose backend port
 EXPOSE 4000
 
-# Run DB migration then start server
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=prisma/schema.prisma && node dist/index.js"]
+# Run DB schema push then start server (since we don't track a migrations folder)
+CMD ["sh", "-c", "npx prisma db push --schema=prisma/schema.prisma --accept-data-loss && node dist/index.js"]
