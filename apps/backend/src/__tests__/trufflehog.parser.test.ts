@@ -28,8 +28,7 @@ describe('parseTruffleHogOutput', () => {
         Verified: false,
         SourceMetadata: {
           Data: {
-            Filesystem: { file: 'src/alerts.ts', line: 42 },
-            Git: { commit: 'f6g7h8i9j0' }
+            Git: { file: 'src/alerts.ts', line: 42, commit: 'f6g7h8i9j0' }
           }
         }
       })

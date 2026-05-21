@@ -83,8 +83,8 @@ export function parseTruffleHogOutput(rawOutput: string): NormalizedSecret[] {
       findings.push({
         type: data.DetectorName || 'Unknown Secret',
         source: 'git',
-        file: data.SourceMetadata?.Data?.Filesystem?.file || null,
-        line: data.SourceMetadata?.Data?.Filesystem?.line || null,
+        file: data.SourceMetadata?.Data?.Filesystem?.file || data.SourceMetadata?.Data?.Git?.file || null,
+        line: data.SourceMetadata?.Data?.Filesystem?.line || data.SourceMetadata?.Data?.Git?.line || null,
         commitSha: data.SourceMetadata?.Data?.Git?.commit || null,
         rawFinding: data,
         isVerified: data.Verified === true,
