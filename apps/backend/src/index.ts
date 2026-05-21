@@ -42,7 +42,8 @@ async function bootstrap() {
   httpServer.listen(PORT, async () => {
     console.log(`\n🚀 DevLens Backend running at http://localhost:${PORT}`);
     console.log(`📡 WebSocket available at ws://localhost:${PORT}`);
-    console.log(`🔗 Health check: http://localhost:${PORT}/health\n`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+    console.log(`🪝 Webhook listener active on /api/webhooks/pipeline\n`);
   });
 
   // 6. Graceful shutdown
