@@ -3,6 +3,7 @@
 import { useWebSocket } from '@/components/providers/WebSocketProvider';
 import { usePathname } from 'next/navigation';
 import { Wifi, WifiOff } from 'lucide-react';
+import { UserButton } from '@clerk/nextjs';
 
 const TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -67,6 +68,9 @@ export function Header() {
             ? <><Wifi size={12} /> Live</>
             : <><WifiOff size={12} /> Offline</>}
         </div>
+
+        {/* Account / sign out */}
+        <UserButton />
       </div>
     </header>
   );
