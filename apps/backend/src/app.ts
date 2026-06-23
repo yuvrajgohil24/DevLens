@@ -24,6 +24,7 @@ import {
   executeGitAction,
 } from './api/devflow';
 import { getRiskTrends, getMttr } from './api/analytics';
+import { createDemoSession } from './api/demo';
 
 const app = express();
 
@@ -47,16 +48,33 @@ app.get('/health', (_req, res) => {
 
 // ── Auth Middleware ──────────────────────────────────────────
 import { protectRoute } from './middleware/auth';
+import { blockDemoWrites } from './middleware/demoGuard';
+
+// Public /api/ routes that must NOT require a Clerk session.
+const isPublicApi = (path: string) =>
+  path.startsWith('/api/webhooks/') || path.startsWith('/api/demo/');
+
 app.use((req, res, next) => {
-  // Protect all /api/ routes EXCEPT webhooks
-  if (req.path.startsWith('/api/') && !req.path.startsWith('/api/webhooks/')) {
+  // Protect all /api/ routes except the public ones above
+  if (req.path.startsWith('/api/') && !isPublicApi(req.path)) {
     return protectRoute(req, res, next);
+  }
+  next();
+});
+
+// Read-only enforcement for the public demo account (runs after auth populates req.auth)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') && !isPublicApi(req.path)) {
+    return blockDemoWrites(req, res, next);
   }
   next();
 });
 
 // ── Webhooks ───────────────────────────────────────────────
 app.post('/api/webhooks/pipeline', handlePipelineWebhook);
+
+// ── Demo / Guest session (public) ──────────────────────────
+app.post('/api/demo/session', createDemoSession);
 
 // ── Dashboard ──────────────────────────────────────────────
 app.get('/api/dashboard/overview', getOverview);

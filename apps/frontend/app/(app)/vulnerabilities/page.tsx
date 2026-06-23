@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { api, Vulnerability } from '@/lib/api';
+import { useDemoMode } from '@/lib/demo';
 import { useWebSocket } from '@/components/providers/WebSocketProvider';
 import { SeverityBadge } from '@/components/ui/StatusBadge';
 import { ShieldAlert, CheckCircle2, Filter } from 'lucide-react';
@@ -17,6 +18,7 @@ export default function VulnerabilitiesPage() {
   const [severity, setSeverity] = useState('all');
   const [resolved, setResolved] = useState('open');
   const { lastScan } = useWebSocket();
+  const isDemo = useDemoMode();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -34,6 +36,7 @@ export default function VulnerabilitiesPage() {
   useEffect(() => { if (lastScan) load(); }, [lastScan, load]);
 
   const handleResolve = async (id: string) => {
+    if (isDemo) return; // read-only demo
     await api.vulnerabilities.resolve(id);
     load();
   };
@@ -133,11 +136,13 @@ export default function VulnerabilitiesPage() {
                   <td><span style={{ fontSize:'0.75rem', color:'var(--text-muted)' }}>{formatDistanceToNow(new Date(v.detectedAt),{addSuffix:true})}</span></td>
                   <td>
                     {!v.isResolved ? (
-                      <button onClick={()=>handleResolve(v.id)} style={{
+                      <button onClick={()=>handleResolve(v.id)} disabled={isDemo}
+                        title={isDemo ? 'Disabled in demo mode' : undefined} style={{
                         display:'flex',alignItems:'center',gap:4,
                         background:'var(--success-bg)',color:'var(--success)',
                         border:'1px solid rgba(52,211,153,0.25)',borderRadius:5,
-                        padding:'4px 8px',cursor:'pointer',fontSize:'0.72rem',fontWeight:600,
+                        padding:'4px 8px',cursor:isDemo?'not-allowed':'pointer',
+                        opacity:isDemo?0.45:1,fontSize:'0.72rem',fontWeight:600,
                       }}>
                         <CheckCircle2 size={11}/> Resolve
                       </button>
