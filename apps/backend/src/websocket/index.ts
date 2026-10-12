@@ -1,7 +1,16 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
+import IORedis from 'ioredis';
+import { createRedisConnection } from '../db/redis';
 
 let _io: SocketIOServer | null = null;
+
+/**
+ * Events from a separate worker process (which has no Socket.io server) travel
+ * over this Redis pub/sub channel; the API process re-broadcasts them.
+ */
+const EVENTS_CHANNEL = 'devlens:ws-events';
+let publisher: IORedis | null = null;
 
 export function initializeWebSocket(httpServer: HTTPServer): SocketIOServer {
   _io = new SocketIOServer(httpServer, {
@@ -25,6 +34,18 @@ export function initializeWebSocket(httpServer: HTTPServer): SocketIOServer {
     });
   });
 
+  // Relay events published by standalone worker processes
+  const subscriber = createRedisConnection();
+  subscriber.subscribe(EVENTS_CHANNEL).catch((err) => console.error('❌ WS relay subscribe failed:', err.message));
+  subscriber.on('message', (_channel, raw) => {
+    try {
+      const { event, data } = JSON.parse(raw);
+      _io?.emit(event, data);
+    } catch (err) {
+      console.error('⚠️ Ignoring malformed WS relay message:', (err as Error).message);
+    }
+  });
+
   console.log('✅ WebSocket server initialized');
   return _io;
 }
@@ -34,17 +55,29 @@ export function getIO(): SocketIOServer {
   return _io;
 }
 
+/** Emits directly when this process owns the Socket.io server, otherwise relays via Redis. */
+function emit(event: string, data: unknown) {
+  if (_io) {
+    _io.emit(event, data);
+    return;
+  }
+  publisher ??= createRedisConnection();
+  publisher.publish(EVENTS_CHANNEL, JSON.stringify({ event, data })).catch((err) => {
+    console.error(`⚠️ Failed to relay WS event ${event}:`, err.message);
+  });
+}
+
 // Typed emit helpers
 export const wsEvents = {
   deploymentCreated: (data: { deploymentId: string; serviceName: string; status: string }) =>
-    getIO().emit('deployment_created', data),
+    emit('deployment_created', data),
 
   deploymentUpdated: (data: { deploymentId: string; status: string }) =>
-    getIO().emit('deployment_updated', data),
+    emit('deployment_updated', data),
 
   scanCompleted: (data: { deploymentId: string; serviceId: string; criticalCount: number; riskScore: number }) =>
-    getIO().emit('scan_completed', data),
+    emit('scan_completed', data),
 
   criticalCveDetected: (data: { deploymentId: string; serviceName: string; cveId: string; title: string }) =>
-    getIO().emit('critical_cve_detected', data),
+    emit('critical_cve_detected', data),
 };

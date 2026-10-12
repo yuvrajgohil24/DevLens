@@ -23,3 +23,6 @@ export interface ScannerResult<T = unknown> {
   /** The scanner is not configured (e.g. no SNYK_TOKEN) and did not run */
   skipped?: boolean;
 }
+
+/** Upper bound for a single scanner run (SCANNER_TIMEOUT_MS, default 10 minutes). */
+export const SCANNER_TIMEOUT_MS = parseInt(process.env.SCANNER_TIMEOUT_MS || String(10 * 60 * 1000), 10);

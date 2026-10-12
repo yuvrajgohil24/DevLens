@@ -111,7 +111,7 @@ const CVE_POOL: NormalizedVulnerability[] = [
   },
 ];
 
-import { mockScannersAllowed, ScannerResult } from './mock';
+import { mockScannersAllowed, ScannerResult, SCANNER_TIMEOUT_MS } from './mock';
 
 export async function runTrivy(targetPath: string): Promise<ScannerResult> {
   // Try to find trivy in common locations
@@ -126,7 +126,7 @@ export async function runTrivy(targetPath: string): Promise<ScannerResult> {
     const command = `"${trivyBin}" fs --format json "${targetPath}"`;
     try {
       console.log(`🔍 [TRIVY] Trying: ${trivyBin}`);
-      const { stdout } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10 });
+      const { stdout } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10, timeout: SCANNER_TIMEOUT_MS });
       console.log(`✅ [TRIVY] Real scan complete`);
       return { output: JSON.parse(stdout), isMock: false };
     } catch (err: any) {

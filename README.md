@@ -42,14 +42,16 @@ In modern DevOps, security is often an afterthought or buried in complex logs. *
 
 ## Demo
 
-> **Local setup requires PostgreSQL 16 + Redis 7.** For a zero-config preview, use the Docker Compose route below.
+> **Local setup requires PostgreSQL 16 + Redis 7.** Docker Compose can provide them for you.
 
-### One-Command Setup (No Local DB/Redis Required)
+### Backend Stack via Docker Compose
 ```bash
-docker-compose up
-# Frontend → http://localhost:3000  |  Backend → http://localhost:4000
+docker compose up --build
+# Backend → http://localhost:4000  (Postgres + Redis + API with the scan worker)
+npm run dev:frontend
+# Frontend → http://localhost:3000
 ```
-Docker Compose boots the full stack with a pre-seeded database. No PostgreSQL or Redis configuration required.
+Compose builds the production backend image, applies database migrations on start, and reads Clerk/GitHub/Slack keys from `.env` if present. The frontend runs with `npm run dev:frontend` (it needs your Clerk keys). Seed sample data with `npm run db:seed`.
 
 ---
 
@@ -84,7 +86,7 @@ graph TD
 | Layer | Technology |
 |---|---|
 | **Frontend** | Next.js 15, TailwindCSS, Socket.io-client, Recharts |
-| **Backend** | Express 5, TypeScript, Socket.io, BullMQ |
+| **Backend** | Express 4, TypeScript, Socket.io, BullMQ |
 | **Data** | Prisma ORM, PostgreSQL 16, Redis 7 |
 | **Security** | Aqua Security Trivy, TruffleHog |
 
@@ -104,7 +106,7 @@ graph TD
 git clone https://github.com/yuvrajgohil24/DevLens.git
 cd DevLens
 
-# Install dependencies, push schema, and seed data
+# Install dependencies, apply database migrations, and seed data
 npm run setup
 ```
 
@@ -118,11 +120,21 @@ npm run dev
 ```bash
 cd apps/backend
 npm test
-# 12 unit tests, zero infrastructure required (no DB / Redis)
+# Unit tests, zero infrastructure required (no DB / Redis)
 ```
 
 ---
 
+
+### 4. Database Changes
+Schema changes go through Prisma migrations (committed in `apps/backend/prisma/migrations`):
+```bash
+npm run db:migrate --workspace=apps/backend   # create + apply a migration after editing schema.prisma
+npm run db:deploy                             # apply pending migrations (what production runs on start)
+```
+CI fails if `schema.prisma` changes without a matching migration.
+
+---
 
 ## API Hub
 

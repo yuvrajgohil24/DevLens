@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import IORedis from 'ioredis';
+import { createRedisConnection } from '../db/redis';
 import { runTrivy, parseTrivyOutput } from '../scanners/trivy';
 import { runTruffleHog, parseTruffleHogOutput } from '../scanners/truffleHog';
 import { runSnyk, parseSnykOutput } from '../scanners/snyk';
@@ -25,9 +25,7 @@ interface ScanJobData {
   pipeline_url?: string;
 }
 
-const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: null,
-});
+const SCAN_CONCURRENCY = parseInt(process.env.SCAN_CONCURRENCY || '2', 10);
 
 const worker = new Worker<ScanJobData>(
   'scan-queue',
@@ -187,8 +185,10 @@ const worker = new Worker<ScanJobData>(
     }
   },
   {
-    connection,
-    concurrency: 3,
+    connection: createRedisConnection(),
+    concurrency: SCAN_CONCURRENCY,
+    // Full clones + scanners can legitimately run for minutes; renew the job lock meanwhile
+    lockDuration: 5 * 60 * 1000,
   }
 );
 
@@ -204,6 +204,6 @@ worker.on('error', (err) => {
   console.error('Worker error:', err);
 });
 
-console.log('🔧 Scan worker started (concurrency: 3)');
+console.log(`🔧 Scan worker started (concurrency: ${SCAN_CONCURRENCY})`);
 
 export default worker;

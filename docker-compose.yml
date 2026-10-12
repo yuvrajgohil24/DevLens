@@ -30,6 +30,32 @@ services:
       timeout: 5s
       retries: 5
 
+  # Backend API + in-process scan worker, built from the production Dockerfile.
+  # Reads Clerk/GitHub/Slack keys from .env if present (see .env.example).
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: devlens-backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://devlens:devlens@postgres:5432/devlens
+      REDIS_URL: redis://redis:6379
+      PORT: '4000'
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      # Local stack: allow unsigned webhooks and labelled sample data when scanners are unavailable
+      ALLOW_UNSIGNED_WEBHOOKS: ${ALLOW_UNSIGNED_WEBHOOKS:-true}
+      MOCK_SCANNERS: ${MOCK_SCANNERS:-true}
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:

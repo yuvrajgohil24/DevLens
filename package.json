@@ -12,7 +12,8 @@
     "db:push": "npm run db:push --workspace=apps/backend",
     "db:seed": "npm run db:seed --workspace=apps/backend",
     "db:studio": "npm run db:studio --workspace=apps/backend",
-    "setup": "npm install && npm run db:push && npm run db:seed"
+    "setup": "npm install && npm run db:deploy && npm run db:seed",
+    "db:deploy": "npm run db:deploy --workspace=apps/backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -1,5 +1,6 @@
-import { clerkClient } from '@clerk/clerk-sdk-node';
+import { clerkClient } from '@clerk/express';
 import { Request, Response, NextFunction } from 'express';
+import { getUserId } from './auth';
 
 /**
  * Role-based access control.
@@ -49,7 +50,7 @@ export async function getUserRole(userId: string): Promise<Role> {
 export async function requireAdminForWrites(req: Request, res: Response, next: NextFunction) {
   if (!WRITE_METHODS.has(req.method)) return next();
 
-  const userId = (req as any).auth?.userId as string | undefined;
+  const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   if ((await getUserRole(userId)) !== 'admin') {
@@ -69,7 +70,7 @@ export function localGitActionsEnabled(): boolean {
 
 // GET /api/me — lets the frontend hide actions the user isn't allowed to perform
 export async function getCurrentUser(req: Request, res: Response) {
-  const userId = (req as any).auth?.userId as string;
+  const userId = getUserId(req) as string; // route is behind protectRoute
   const role = await getUserRole(userId);
   return res.json({
     userId,

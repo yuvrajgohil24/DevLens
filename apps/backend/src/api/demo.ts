@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { clerkClient } from '@clerk/clerk-sdk-node';
+import { clerkClient } from '@clerk/express';
 
 const DEMO_USER_ID = process.env.DEMO_USER_ID;
 

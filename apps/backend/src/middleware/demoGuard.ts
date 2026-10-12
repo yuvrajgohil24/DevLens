@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { getUserId } from './auth';
 
 /**
  * Read-only guard for the public demo account.
@@ -12,7 +13,7 @@ const DEMO_USER_ID = process.env.DEMO_USER_ID;
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export function blockDemoWrites(req: Request, res: Response, next: NextFunction) {
-  const userId = (req as any).auth?.userId as string | undefined;
+  const userId = getUserId(req);
 
   if (DEMO_USER_ID && userId === DEMO_USER_ID && WRITE_METHODS.has(req.method)) {
     return res.status(403).json({

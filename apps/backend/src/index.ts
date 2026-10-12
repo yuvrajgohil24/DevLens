@@ -10,8 +10,11 @@ import { redisConnection } from './db/redis';
 import prisma from './db/prisma';
 import { backfillSeverityRanks } from './db/backfill';
 
-// Import worker to register BullMQ processor
-import './jobs/scanWorker';
+// By default the scan worker runs inside the API process (simple single-service
+// deploy). Set RUN_SCAN_WORKER=false here and run `npm run start:worker` as a
+// separate service so long scans can't slow down or OOM the API.
+const RUN_SCAN_WORKER = process.env.RUN_SCAN_WORKER !== 'false';
+const scanWorker = RUN_SCAN_WORKER ? require('./jobs/scanWorker').default : null;
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 
@@ -20,7 +23,8 @@ async function bootstrap() {
   try {
     await prisma.$connect();
     console.log('✅ PostgreSQL connected');
-    await backfillSeverityRanks();
+    // Best effort: sorting falls back gracefully if this fails, so don't block boot
+    await backfillSeverityRanks().catch((err) => console.warn('⚠️ Severity rank backfill skipped:', err.message));
   } catch (err) {
     console.error('❌ Failed to connect to PostgreSQL:', err);
     process.exit(1);
@@ -52,6 +56,7 @@ async function bootstrap() {
   const shutdown = async (signal: string) => {
     console.log(`\n${signal} received — shutting down gracefully...`);
     httpServer.close(async () => {
+      if (scanWorker) await scanWorker.close();
       await prisma.$disconnect();
       await redisConnection.quit();
       console.log('✅ Shutdown complete');

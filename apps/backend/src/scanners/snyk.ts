@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { NormalizedVulnerability } from './trivy';
-import { mockScannersAllowed, ScannerResult } from './mock';
+import { mockScannersAllowed, ScannerResult, SCANNER_TIMEOUT_MS } from './mock';
 
 const execAsync = promisify(exec);
 
@@ -26,6 +26,7 @@ export async function runSnyk(targetPath: string): Promise<ScannerResult> {
     // Passing the SNYK_TOKEN via environment variables
     const { stdout } = await execAsync(command, {
       maxBuffer: 1024 * 1024 * 10,
+      timeout: SCANNER_TIMEOUT_MS,
       env: { ...process.env, SNYK_TOKEN: snykToken }
     });
 

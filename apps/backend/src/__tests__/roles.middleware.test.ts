@@ -5,7 +5,12 @@
 import { Request, Response } from 'express';
 
 const getUser = jest.fn();
-jest.mock('@clerk/clerk-sdk-node', () => ({ clerkClient: { users: { getUser } } }));
+jest.mock('@clerk/express', () => ({
+  clerkClient: { users: { getUser } },
+  clerkMiddleware: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  // Tests put the auth state directly on the fake request
+  getAuth: (req: { auth?: { userId: string } }) => req.auth ?? { userId: null },
+}));
 
 import { requireAdminForWrites, getUserRole, localGitActionsEnabled } from '../middleware/roles';
 

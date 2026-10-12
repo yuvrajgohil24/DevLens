@@ -25,19 +25,28 @@
 # 2. Railway will auto-create REDIS_URL — copy it
 
 # ── STEP 4: Configure Backend Service ────────────────────────────────────────
-# In the Backend service (the GitHub service Railway created):
-# 1. Go to "Settings" tab
-# 2. Set "Root Directory" → apps/backend
-# 3. Set "Build Command" → (leave empty — Dockerfile handles it)
-# 4. Set "Watch Paths" → apps/backend/**
-# Railway will auto-detect the Dockerfile
+# In the Backend service (the GitHub service Railway created) → "Settings":
+# 1. Root Directory      → (leave EMPTY — the Docker build needs the repo-root lockfile)
+# 2. Config file path    → /apps/backend/railway.json
+#    (sets Dockerfile = apps/backend/Dockerfile, healthcheck /health, watch paths)
+# 3. Build/Start Command → leave empty (the image runs migrations, then the API)
+#
+# On first deploy the start script baselines a database created by the old
+# `prisma db push` start command, then applies pending migrations. No data loss.
+
+# ── STEP 4b (optional): Separate scan worker ─────────────────────────────────
+# Long scans (git clone + Trivy + TruffleHog) can run in their own service so
+# they never slow down the API:
+# 1. "+ New" → "GitHub Repo" → same repo → name it "devlens-worker"
+# 2. Settings → Root Directory: (empty) · Config file path: /apps/backend/railway.worker.json
+# 3. Variables: same as the backend (Step 5) — no public domain needed
+# 4. On the API service add: RUN_SCAN_WORKER=false
 
 # ── STEP 5: Set Backend Environment Variables ─────────────────────────────────
 # In Backend service → "Variables" tab, add ALL of these:
 
 DATABASE_URL=${{Postgres.DATABASE_URL}}
-REDIS_URL=${{Redis.REDIS_URL}}
-PORT=4000
+REDIS_URL=${{Redis.REDIS_URL}}?family=0   # family=0: Railway private network is IPv6
 NODE_ENV=production
 FRONTEND_URL=https://your-vercel-app.vercel.app
 
@@ -59,6 +68,11 @@ WEBHOOK_SECRET=output_of_openssl_rand_hex_32
 ADMIN_USER_IDS=user_your_own_clerk_id
 
 # Do NOT set in production: LOCAL_GIT_ACTIONS (server-side git push/pull) or MOCK_SCANNERS=true
+
+# Optional tuning
+# RUN_SCAN_WORKER=false        # only when a separate worker service runs (Step 4b)
+# SCAN_CONCURRENCY=2           # parallel scans per worker
+# SCANNER_TIMEOUT_MS=600000    # max time per scanner run
 
 # ── STEP 6: Deploy Backend ────────────────────────────────────────────────────
 # Click "Deploy" in Railway

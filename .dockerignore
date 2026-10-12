@@ -1,0 +1,20 @@
+# Build context is the repo root (for the workspace lockfile) — keep it small.
+**/node_modules
+**/dist
+**/.next
+.git
+.github
+.env
+**/.env
+**/.env.*
+!.env.example
+**/*.log
+coverage
+assets
+scratch
+test-repo
+apps/backend/bin
+
+# The backend image only needs the frontend's package.json (referenced by the lockfile)
+apps/frontend/*
+!apps/frontend/package.json

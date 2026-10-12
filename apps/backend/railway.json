@@ -2,10 +2,12 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile"
+    "dockerfilePath": "apps/backend/Dockerfile",
+    "watchPatterns": ["apps/backend/**", "package-lock.json"]
   },
   "deploy": {
-    "startCommand": "npx prisma db push --schema=prisma/schema.prisma --accept-data-loss && node dist/index.js",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }

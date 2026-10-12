@@ -1,23 +1,34 @@
-import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
+import { clerkMiddleware, getAuth } from '@clerk/express';
 import { Request, Response, NextFunction } from 'express';
 
-// StrictAuth checks for the Clerk Bearer token and attaches auth info to req.auth
-export const requireAuth = ClerkExpressRequireAuth({
-  // In development, you can loosen the checks if needed
-  // ...
+/**
+ * Verifies the Clerk session token (Bearer header) and attaches the auth state
+ * to the request. It never blocks on its own — protectRoute does that.
+ * The frontend's NEXT_PUBLIC_ key is accepted as a fallback so a shared .env works.
+ */
+const clerkAuth = clerkMiddleware({
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 });
 
-// A wrapper to handle the 401 response nicely instead of the default Clerk error page
+/** The signed-in Clerk user id, or undefined if the request is not authenticated. */
+export function getUserId(req: Request): string | undefined {
+  try {
+    return getAuth(req).userId ?? undefined;
+  } catch {
+    return undefined; // clerkMiddleware did not run for this request
+  }
+}
+
+/** Authenticates the request and responds 401 (JSON, no redirect) when there is no valid session. */
 export const protectRoute = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  
-  requireAuth(req, res, (err: any) => {
+  clerkAuth(req, res, (err?: unknown) => {
     if (err) {
-      console.error('❌ Auth error:', err.message);
-      console.error('Header received:', authHeader ? 'Present' : 'Missing');
-      return res.status(401).json({ error: 'Unauthorized', message: err.message });
+      console.error('❌ Auth error:', (err as Error).message);
+      return res.status(401).json({ error: 'Unauthorized', message: 'Invalid session' });
     }
-    // console.log('✅ Auth success for user:', (req as any).auth?.userId);
+    if (!getUserId(req)) {
+      return res.status(401).json({ error: 'Unauthorized', message: 'Sign in required' });
+    }
     next();
   });
 };

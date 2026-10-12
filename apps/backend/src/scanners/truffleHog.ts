@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
+import { SCANNER_TIMEOUT_MS } from './mock';
 import { pathToFileURL } from 'url';
 
 const execAsync = promisify(exec);
@@ -88,12 +89,17 @@ export async function runTruffleHog(repoPath: string): Promise<string> {
   try {
     const { stdout } = await execAsync(command, {
       maxBuffer: 1024 * 1024 * 20, // 20MB buffer
+      timeout: SCANNER_TIMEOUT_MS,
       cwd: repoPath.startsWith('http') ? undefined : repoPath,
     });
     return stdout;
   } catch (err: any) {
     // TruffleHog exits with code 1 when secrets ARE found — that's normal!
     // stdout will contain the JSON findings in this case.
+    // A timeout kills the process: partial output is not a complete scan.
+    if (err.killed) {
+      throw new Error(`TruffleHog scan timed out after ${SCANNER_TIMEOUT_MS}ms`);
+    }
     if (err.stdout) {
       console.log(`✅ [TRUFFLEHOG] Scan complete (secrets found in output)`);
       return err.stdout;

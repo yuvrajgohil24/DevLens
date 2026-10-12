@@ -6,13 +6,31 @@ on:
     paths:
       - 'apps/backend/**'
       - 'apps/frontend/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main, develop]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # Tests, lint, type checks, builds and dependency audit. Runs on pushes and PRs;
+  # on pushes it also reports the run to the DevLens webhook.
   build-and-notify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       WEBHOOK_URL: ${{ secrets.DEVLENS_WEBHOOK_URL }}
+      # Notifications only for pushes (secrets aren't available to fork PRs anyway)
+      NOTIFY: ${{ github.event_name == 'push' && secrets.DEVLENS_WEBHOOK_URL != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,32 +47,35 @@ jobs:
             CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff-tree --no-commit-id -r --name-only HEAD)
           fi
           echo "Changed files: $CHANGED"
-          
+
           if echo "$CHANGED" | grep -q "^apps/backend/"; then
-            echo "service=backend" >> $GITHUB_OUTPUT
-            echo "lang=Node.js" >> $GITHUB_OUTPUT
+            echo "service=backend" >> "$GITHUB_OUTPUT"
+            echo "lang=Node.js" >> "$GITHUB_OUTPUT"
           elif echo "$CHANGED" | grep -q "^apps/frontend/"; then
-            echo "service=frontend" >> $GITHUB_OUTPUT
-            echo "lang=Next.js" >> $GITHUB_OUTPUT
+            echo "service=frontend" >> "$GITHUB_OUTPUT"
+            echo "lang=Next.js" >> "$GITHUB_OUTPUT"
           else
-            echo "service=devlens" >> $GITHUB_OUTPUT
-            echo "lang=TypeScript" >> $GITHUB_OUTPUT
+            echo "service=devlens" >> "$GITHUB_OUTPUT"
+            echo "lang=TypeScript" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set Dynamic Service Name
         id: naming
+        env:
+          SERVICE: ${{ steps.filter.outputs.service }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          BASE_NAME="devlens-${{ steps.filter.outputs.service }}"
-          if [ "${{ github.ref_name }}" != "main" ]; then
-            echo "full_name=${BASE_NAME}-${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "env=staging" >> $GITHUB_OUTPUT
+          BASE_NAME="devlens-${SERVICE}"
+          if [ "$REF_NAME" != "main" ]; then
+            echo "full_name=${BASE_NAME}-${REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "env=staging" >> "$GITHUB_OUTPUT"
           else
-            echo "full_name=${BASE_NAME}" >> $GITHUB_OUTPUT
-            echo "env=production" >> $GITHUB_OUTPUT
+            echo "full_name=${BASE_NAME}" >> "$GITHUB_OUTPUT"
+            echo "env=production" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Notify DevLens — Deployment Started
-        if: env.WEBHOOK_URL != ''
+        if: env.NOTIFY == 'true'
         continue-on-error: true
         env:
           WEBHOOK_SECRET: ${{ secrets.DEVLENS_WEBHOOK_SECRET }}
@@ -74,24 +95,52 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
 
       - name: Install Dependencies
         run: npm ci
 
-      - name: Generate Prisma Client (Backend Only)
-        if: steps.filter.outputs.service == 'backend'
+      # ── Backend ──────────────────────────────────────────────
+      - name: Generate Prisma Client
         run: npx prisma generate --schema=apps/backend/prisma/schema.prisma
 
-      - name: Type Check (Conditional)
+      - name: Backend — Type Check
+        run: npx tsc --noEmit -p apps/backend/tsconfig.json
+
+      - name: Backend — Unit Tests
+        run: npm test --workspace=apps/backend -- --ci
+
+      - name: Backend — Migrations match schema.prisma
         run: |
-          if [ "${{ steps.filter.outputs.service }}" == "backend" ]; then
-            npx tsc --noEmit -p apps/backend/tsconfig.json
-          else
-            npx tsc --noEmit -p apps/frontend/tsconfig.json
-          fi
+          npx prisma migrate diff \
+            --from-migrations apps/backend/prisma/migrations \
+            --to-schema-datamodel apps/backend/prisma/schema.prisma \
+            --shadow-database-url "postgresql://postgres:postgres@localhost:5432/shadow" \
+            --exit-code \
+          || { echo "::error::prisma/schema.prisma has changes without a migration. Run: npm run db:migrate --workspace=apps/backend"; exit 1; }
+
+      # ── Frontend ─────────────────────────────────────────────
+      - name: Frontend — Type Check
+        run: npx tsc --noEmit -p apps/frontend/tsconfig.json
+
+      - name: Frontend — Lint
+        run: npm run lint --workspace=apps/frontend
+
+      - name: Frontend — Build
+        env:
+          # Placeholder (valid-format) Clerk keys: the build only needs them to exist
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+          CLERK_SECRET_KEY: sk_test_ci_placeholder
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build --workspace=apps/frontend
+
+      # ── Supply chain ─────────────────────────────────────────
+      - name: Audit Production Dependencies
+        run: npm audit --omit=dev --audit-level=critical
 
       - name: Notify DevLens — Build Success
-        if: success() && env.WEBHOOK_URL != ''
+        if: success() && env.NOTIFY == 'true'
         continue-on-error: true
         env:
           WEBHOOK_SECRET: ${{ secrets.DEVLENS_WEBHOOK_SECRET }}
@@ -105,7 +154,7 @@ jobs:
         run: bash scripts/notify-devlens.sh
 
       - name: Notify DevLens — Build Failed
-        if: failure() && env.WEBHOOK_URL != ''
+        if: failure() && env.NOTIFY == 'true'
         continue-on-error: true
         env:
           WEBHOOK_SECRET: ${{ secrets.DEVLENS_WEBHOOK_SECRET }}
@@ -117,3 +166,35 @@ jobs:
           ENVIRONMENT: ${{ steps.naming.outputs.env }}
           PIPELINE_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: bash scripts/notify-devlens.sh
+
+    services:
+      # Shadow database for the migrations-vs-schema drift check
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shadow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+  # Builds the production backend image (not pushed) so Dockerfile breakage is caught before deploy
+  docker-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -f apps/backend/Dockerfile -t devlens-backend:ci .
+
+      - name: Image runs as non-root with pinned scanners
+        run: |
+          test "$(docker run --rm --entrypoint id devlens-backend:ci -u)" != "0"
+          docker run --rm --entrypoint trivy devlens-backend:ci --version
+          docker run --rm --entrypoint trufflehog devlens-backend:ci --version
