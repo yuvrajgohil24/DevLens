@@ -89,4 +89,26 @@ describe('parseTruffleHogOutput', () => {
       isVerified: false
     });
   });
+
+  it('should never keep the plaintext secret in rawFinding', () => {
+    const mockOutput = JSON.stringify({
+      DetectorName: 'AWS',
+      Verified: false,
+      Raw: 'AKIAIOSFODNN7EXAMPLE',
+      RawV2: 'AKIAIOSFODNN7EXAMPLEwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+      Redacted: 'AKIAIOSFODNN7EXAMPLE',
+      ExtraData: { account: '123456789012' },
+      SourceMetadata: { Data: { Git: { file: '.env', line: 3, commit: 'a1b2c3d' } } },
+    });
+
+    const [finding] = parseTruffleHogOutput(mockOutput);
+    const stored = JSON.stringify(finding.rawFinding);
+
+    expect(stored).not.toContain('AKIAIOSFODNN7EXAMPLE');
+    expect(stored).not.toContain('wJalrXUtnFEMI');
+    expect(finding.rawFinding).not.toHaveProperty('Raw');
+    expect(finding.rawFinding).not.toHaveProperty('ExtraData');
+    expect(finding.rawFinding.fingerprint).toMatch(/^[0-9a-f]{16}$/);
+    expect(finding.file).toBe('.env');
+  });
 });

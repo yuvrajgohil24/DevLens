@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import prisma from '../db/prisma';
 import { scanQueue } from '../db/redis';
 import { getOrCreateService } from '../services/serviceService';
@@ -10,6 +11,25 @@ import {
   getOwnerRepos,
   resolveRepo,
 } from '../services/githubService';
+import { branchSchema, commitShaSchema, REPO_NAME_REGEX } from '../utils/validation';
+
+const TriggerDeploySchema = z.object({
+  branch: branchSchema.default('main'),
+  environment: z.enum(['staging', 'production']).default('staging'),
+  commit_sha: commitShaSchema.optional(),
+  commit_message: z.string().max(1000).optional(),
+});
+
+/** Resolves :repoId to a repo name, or responds 400 and returns null if it is not a safe repo name. */
+function resolveRepoParam(req: Request, res: Response): string | null {
+  const { repoId } = req.params;
+  const repoName = REPO_NAME_REGEX.test(repoId) ? resolveRepo(repoId) : null;
+  if (!repoName || !REPO_NAME_REGEX.test(repoName)) {
+    res.status(400).json({ error: 'Invalid repository id' });
+    return null;
+  }
+  return repoName;
+}
 
 // GET /api/devflow/repos
 export async function getRepos(_req: Request, res: Response) {
@@ -32,8 +52,9 @@ export async function getBranches(req: Request, res: Response) {
   if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_OWNER) {
     return res.status(503).json({ error: 'GitHub credentials not configured.' });
   }
+  const repoName = resolveRepoParam(req, res);
+  if (!repoName) return;
   try {
-    const repoName = resolveRepo(repoId);
     console.log(`🌿 [DevFlow] Fetching real branches for ${process.env.GITHUB_OWNER}/${repoName}`);
     const branches = await ghGetBranches(repoName);
     return res.json({ data: branches, repo: repoId, source: 'github' });
@@ -51,8 +72,12 @@ export async function getCommits(req: Request, res: Response) {
   if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_OWNER) {
     return res.status(503).json({ error: 'GitHub credentials not configured.' });
   }
+  const repoName = resolveRepoParam(req, res);
+  if (!repoName) return;
+  if (!branchSchema.safeParse(branch).success) {
+    return res.status(400).json({ error: 'Invalid branch name' });
+  }
   try {
-    const repoName = resolveRepo(repoId);
     console.log(`📝 [DevFlow] Fetching real commits for ${process.env.GITHUB_OWNER}/${repoName}@${branch}`);
     const commits = await ghGetCommits(repoName, String(branch));
     return res.json({ data: commits, repo: repoId, branch, source: 'github' });
@@ -67,9 +92,15 @@ export async function getCommits(req: Request, res: Response) {
 export async function triggerDeploy(req: Request, res: Response) {
   try {
     const { repoId } = req.params;
-    const { branch = 'main', environment = 'staging', commit_sha, commit_message } = req.body;
+    const repoName = resolveRepoParam(req, res);
+    if (!repoName) return;
 
-    const repoName = resolveRepo(repoId);
+    const parseResult = TriggerDeploySchema.safeParse(req.body ?? {});
+    if (!parseResult.success) {
+      return res.status(400).json({ error: 'Invalid payload', details: parseResult.error.flatten() });
+    }
+    const { branch, environment, commit_sha, commit_message } = parseResult.data;
+
     const owner = process.env.GITHUB_OWNER || 'unknown';
 
     // Use provided SHA (from real commit list) or generate one for manual deploys
@@ -150,9 +181,9 @@ import { getGitStatus, gitFetch, gitPull, gitPush } from '../services/gitService
 // GET /api/devflow/repos/:repoId/git/status
 export async function getLocalGitStatus(req: Request, res: Response) {
   try {
-    const { repoId } = req.params;
-    const repoName = resolveRepo(repoId);
-    
+    const repoName = resolveRepoParam(req, res);
+    if (!repoName) return;
+
     const status = await getGitStatus(repoName);
     return res.json({ success: true, data: status });
   } catch (err: any) {
@@ -169,9 +200,9 @@ export async function getLocalGitStatus(req: Request, res: Response) {
 // POST /api/devflow/repos/:repoId/git/action
 export async function executeGitAction(req: Request, res: Response) {
   try {
-    const { repoId } = req.params;
     const { action } = req.body;
-    const repoName = resolveRepo(repoId);
+    const repoName = resolveRepoParam(req, res);
+    if (!repoName) return;
 
     let result;
     switch (action) {

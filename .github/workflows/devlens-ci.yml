@@ -56,23 +56,19 @@ jobs:
       - name: Notify DevLens — Deployment Started
         if: env.WEBHOOK_URL != ''
         continue-on-error: true
-        run: |
-          curl -v --max-time 60 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
-            -H "Content-Type: application/json" \
-            -H "Bypass-Tunnel-Reminder: true" \
-            -H "ngrok-skip-browser-warning: true" \
-            -d '{
-              "commit_sha":      "${{ github.sha }}",
-              "service_name":    "${{ steps.naming.outputs.full_name }}",
-              "branch":          "${{ github.ref_name }}",
-              "author":          "${{ github.actor }}",
-              "status":          "running",
-              "environment":     "${{ steps.naming.outputs.env }}",
-              "commit_message":  "${{ github.event.head_commit.message }}",
-              "pipeline_url":    "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              "language":        "${{ steps.filter.outputs.lang }}",
-              "repo_url":        "https://github.com/${{ github.repository }}"
-            }'
+        env:
+          WEBHOOK_SECRET: ${{ secrets.DEVLENS_WEBHOOK_SECRET }}
+          COMMIT_SHA: ${{ github.sha }}
+          SERVICE_NAME: ${{ steps.naming.outputs.full_name }}
+          BRANCH: ${{ github.ref_name }}
+          AUTHOR: ${{ github.actor }}
+          STATUS: running
+          ENVIRONMENT: ${{ steps.naming.outputs.env }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          PIPELINE_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LANGUAGE: ${{ steps.filter.outputs.lang }}
+          REPO_URL: https://github.com/${{ github.repository }}
+        run: bash scripts/notify-devlens.sh
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -97,35 +93,27 @@ jobs:
       - name: Notify DevLens — Build Success
         if: success() && env.WEBHOOK_URL != ''
         continue-on-error: true
-        run: |
-          curl -v --max-time 60 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
-            -H "Content-Type: application/json" \
-            -H "Bypass-Tunnel-Reminder: true" \
-            -H "ngrok-skip-browser-warning: true" \
-            -d '{
-              "commit_sha": "${{ github.sha }}",
-              "service_name": "${{ steps.naming.outputs.full_name }}",
-              "branch": "${{ github.ref_name }}",
-              "author": "${{ github.actor }}",
-              "status": "success",
-              "environment": "${{ steps.naming.outputs.env }}",
-              "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+        env:
+          WEBHOOK_SECRET: ${{ secrets.DEVLENS_WEBHOOK_SECRET }}
+          COMMIT_SHA: ${{ github.sha }}
+          SERVICE_NAME: ${{ steps.naming.outputs.full_name }}
+          BRANCH: ${{ github.ref_name }}
+          AUTHOR: ${{ github.actor }}
+          STATUS: success
+          ENVIRONMENT: ${{ steps.naming.outputs.env }}
+          PIPELINE_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash scripts/notify-devlens.sh
 
       - name: Notify DevLens — Build Failed
         if: failure() && env.WEBHOOK_URL != ''
         continue-on-error: true
-        run: |
-          curl -v --max-time 60 -X POST ${{ env.WEBHOOK_URL }}/api/webhooks/pipeline \
-            -H "Content-Type: application/json" \
-            -H "Bypass-Tunnel-Reminder: true" \
-            -H "ngrok-skip-browser-warning: true" \
-            -d '{
-              "commit_sha": "${{ github.sha }}",
-              "service_name": "${{ steps.naming.outputs.full_name }}",
-              "branch": "${{ github.ref_name }}",
-              "author": "${{ github.actor }}",
-              "status": "failed",
-              "environment": "${{ steps.naming.outputs.env }}",
-              "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+        env:
+          WEBHOOK_SECRET: ${{ secrets.DEVLENS_WEBHOOK_SECRET }}
+          COMMIT_SHA: ${{ github.sha }}
+          SERVICE_NAME: ${{ steps.naming.outputs.full_name }}
+          BRANCH: ${{ github.ref_name }}
+          AUTHOR: ${{ github.actor }}
+          STATUS: failed
+          ENVIRONMENT: ${{ steps.naming.outputs.env }}
+          PIPELINE_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash scripts/notify-devlens.sh

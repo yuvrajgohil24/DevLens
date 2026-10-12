@@ -91,7 +91,8 @@ const worker = new Worker<ScanJobData>(
         await insertSecrets(
           parsedSecrets.map(s => ({ ...s, scanId: truffleScan.id, deploymentId: deployment_id, serviceId: service_id }))
         );
-        await completeScan(truffleScan.id, truffleOutput);
+        // Never persist TruffleHog's raw output — it contains the plaintext secrets
+        await completeScan(truffleScan.id, { findingCount: parsedSecrets.length });
 
         // --- 5. POLICY ENGINE (Guardrails) ---
         console.log(`⚖️ [POLICY] Evaluating results...`);

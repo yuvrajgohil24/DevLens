@@ -57,10 +57,27 @@ export async function getDeploymentById(id: string) {
     where: { id },
     include: {
       service: true,
+      // Explicit selects: never return scan.rawOutput or secret.rawFinding to clients
       scans: {
-        include: {
+        select: {
+          id: true,
+          scannerType: true,
+          status: true,
+          startedAt: true,
+          completedAt: true,
           vulnerabilities: true,
-          secrets: true,
+          secrets: {
+            select: {
+              id: true,
+              type: true,
+              source: true,
+              file: true,
+              line: true,
+              commitSha: true,
+              isVerified: true,
+              detectedAt: true,
+            },
+          },
         },
         orderBy: { startedAt: 'desc' },
       },

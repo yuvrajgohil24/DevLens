@@ -12,7 +12,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "ts-node prisma/seed.ts"
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:redact-secrets": "ts-node src/scripts/redactStoredSecrets.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

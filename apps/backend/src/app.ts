@@ -38,7 +38,14 @@ app.use(
   })
 );
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(
+  express.json({
+    // Keep the exact request bytes so webhook HMAC signatures can be verified
+    verify: (req, _res, buf) => {
+      (req as any).rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 
 // ── Health ─────────────────────────────────────────────────
@@ -49,6 +56,7 @@ app.get('/health', (_req, res) => {
 // ── Auth Middleware ──────────────────────────────────────────
 import { protectRoute } from './middleware/auth';
 import { blockDemoWrites } from './middleware/demoGuard';
+import { verifyWebhookSignature } from './middleware/webhookSignature';
 
 // Public /api/ routes that must NOT require a Clerk session.
 const isPublicApi = (path: string) =>
@@ -71,7 +79,7 @@ app.use((req, res, next) => {
 });
 
 // ── Webhooks ───────────────────────────────────────────────
-app.post('/api/webhooks/pipeline', handlePipelineWebhook);
+app.post('/api/webhooks/pipeline', verifyWebhookSignature, handlePipelineWebhook);
 
 // ── Demo / Guest session (public) ──────────────────────────
 app.post('/api/demo/session', createDemoSession);

@@ -4,18 +4,19 @@ import { getOrCreateService } from '../services/serviceService';
 import { createDeployment } from '../services/deploymentService';
 import { scanQueue } from '../db/redis';
 import { wsEvents } from '../websocket/index';
+import { branchSchema, commitShaSchema, repoUrlSchema } from '../utils/validation';
 
-const PipelinePayloadSchema = z.object({
-  commit_sha: z.string().min(7).max(40),
-  service_name: z.string().min(1).max(100),
-  branch: z.string().optional().default('main'),
-  author: z.string().optional().default('unknown'),
+export const PipelinePayloadSchema = z.object({
+  commit_sha: commitShaSchema,
+  service_name: z.string().regex(/^[A-Za-z0-9._\/-]{1,100}$/, 'Invalid service_name'),
+  branch: branchSchema.optional().default('main'),
+  author: z.string().max(100).optional().default('unknown'),
   status: z.enum(['pending', 'running', 'success', 'failed']).default('running'),
   environment: z.enum(['staging', 'production']).default('staging'),
-  pipeline_url: z.string().url().optional(),
-  commit_message: z.string().optional(),
-  language: z.string().optional(),
-  repo_url: z.string().optional(),
+  pipeline_url: z.string().url().startsWith('https://').optional(),
+  commit_message: z.string().max(1000).optional(),
+  language: z.string().max(50).optional(),
+  repo_url: repoUrlSchema.optional(),
 });
 
 export async function handlePipelineWebhook(req: Request, res: Response) {

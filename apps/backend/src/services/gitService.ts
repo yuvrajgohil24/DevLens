@@ -1,9 +1,10 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
+import { REPO_NAME_REGEX } from '../utils/validation';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface GitStatus {
   branch: string;
@@ -23,6 +24,11 @@ export interface GitCommandResult {
  * Resolves the absolute local path for a given repository.
  */
 function getLocalRepoPath(repoName: string): string {
+  // Reject anything that could escape the workspace dir (e.g. '..', path separators)
+  if (!REPO_NAME_REGEX.test(repoName)) {
+    throw new Error(`Invalid repository name: ${repoName}`);
+  }
+
   // Allow explicit override via .env (e.g., LOCAL_REPO_PATH_DevLens=d:\AI_Agents\DevFlow)
   const envOverride = process.env[`LOCAL_REPO_PATH_${repoName}`];
   if (envOverride && fs.existsSync(envOverride)) {
@@ -48,11 +54,11 @@ function getLocalRepoPath(repoName: string): string {
 }
 
 /**
- * Runs a generic git command safely.
+ * Runs a git command with an argument array (no shell).
  */
-async function runGitCommand(repoPath: string, command: string): Promise<GitCommandResult> {
+async function runGitCommand(repoPath: string, args: string[]): Promise<GitCommandResult> {
   try {
-    const { stdout, stderr } = await execAsync(`git ${command}`, { cwd: repoPath, timeout: 30000 });
+    const { stdout, stderr } = await execFileAsync('git', args, { cwd: repoPath, timeout: 30000 });
     return {
       success: true,
       output: (stdout || stderr).trim(),
@@ -76,7 +82,7 @@ export async function getGitStatus(repoName: string): Promise<GitStatus> {
   // output example:
   // ## main...origin/main [ahead 1]
   //  M file.ts
-  const result = await runGitCommand(repoPath, 'status --porcelain -b');
+  const result = await runGitCommand(repoPath, ['status', '--porcelain', '-b']);
   if (!result.success) {
     throw new Error(`Failed to get git status: ${result.error}`);
   }
@@ -113,7 +119,7 @@ export async function getGitStatus(repoName: string): Promise<GitStatus> {
  */
 export async function gitFetch(repoName: string): Promise<GitCommandResult> {
   const repoPath = getLocalRepoPath(repoName);
-  return runGitCommand(repoPath, 'fetch --prune');
+  return runGitCommand(repoPath, ['fetch', '--prune']);
 }
 
 /**
@@ -121,7 +127,7 @@ export async function gitFetch(repoName: string): Promise<GitCommandResult> {
  */
 export async function gitPull(repoName: string): Promise<GitCommandResult> {
   const repoPath = getLocalRepoPath(repoName);
-  return runGitCommand(repoPath, 'pull --rebase');
+  return runGitCommand(repoPath, ['pull', '--rebase']);
 }
 
 /**
@@ -129,5 +135,5 @@ export async function gitPull(repoName: string): Promise<GitCommandResult> {
  */
 export async function gitPush(repoName: string): Promise<GitCommandResult> {
   const repoPath = getLocalRepoPath(repoName);
-  return runGitCommand(repoPath, 'push');
+  return runGitCommand(repoPath, ['push']);
 }

@@ -1,4 +1,5 @@
 import { exec } from 'child_process';
+import crypto from 'crypto';
 import { promisify } from 'util';
 import path from 'path';
 import { pathToFileURL } from 'url';
@@ -13,6 +14,27 @@ export interface NormalizedSecret {
   commitSha: string | null;
   rawFinding: any;
   isVerified: boolean;
+}
+
+/**
+ * Builds a storage-safe copy of a TruffleHog finding.
+ *
+ * TruffleHog's JSON includes the plaintext secret (`Raw`, `RawV2`) and partially
+ * masked values (`Redacted`, `ExtraData`, `StructuredData`). None of that may be
+ * persisted or served by the API, so only an allowlist of metadata is kept,
+ * plus a short one-way fingerprint for de-duplicating the same secret.
+ */
+export function sanitizeTruffleHogFinding(data: any) {
+  const raw = `${data?.Raw ?? ''}${data?.RawV2 ?? ''}`;
+  return {
+    DetectorName: data?.DetectorName ?? null,
+    DetectorType: data?.DetectorType ?? null,
+    DecoderName: data?.DecoderName ?? null,
+    Verified: data?.Verified === true,
+    SourceMetadata: data?.SourceMetadata ?? null,
+    // Keep an existing fingerprint so re-sanitizing an already-clean finding is a no-op
+    fingerprint: raw ? crypto.createHash('sha256').update(raw).digest('hex').slice(0, 16) : (data?.fingerprint ?? null),
+  };
 }
 
 /**
@@ -86,11 +108,12 @@ export function parseTruffleHogOutput(rawOutput: string): NormalizedSecret[] {
         file: data.SourceMetadata?.Data?.Filesystem?.file || data.SourceMetadata?.Data?.Git?.file || null,
         line: data.SourceMetadata?.Data?.Filesystem?.line || data.SourceMetadata?.Data?.Git?.line || null,
         commitSha: data.SourceMetadata?.Data?.Git?.commit || null,
-        rawFinding: data,
+        rawFinding: sanitizeTruffleHogFinding(data),
         isVerified: data.Verified === true,
       });
     } catch (e) {
-      console.warn(`⚠️ [TRUFFLEHOG] Failed to parse line:`, line.slice(0, 50));
+      // Don't log the line itself — it may contain a plaintext secret
+      console.warn(`⚠️ [TRUFFLEHOG] Failed to parse an output line (${line.length} chars)`);
     }
   }
 
