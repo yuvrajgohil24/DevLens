@@ -50,6 +50,15 @@ SNYK_TOKEN=your_snyk_token
 
 CLERK_SECRET_KEY=your_clerk_secret_key
 CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+DEMO_USER_ID=user_xxx
+
+# HMAC secret for /api/webhooks/pipeline (same value as GitHub secret DEVLENS_WEBHOOK_SECRET)
+WEBHOOK_SECRET=output_of_openssl_rand_hex_32
+
+# Access control: comma-separated Clerk user ids allowed to perform write actions
+ADMIN_USER_IDS=user_your_own_clerk_id
+
+# Do NOT set in production: LOCAL_GIT_ACTIONS (server-side git push/pull) or MOCK_SCANNERS=true
 
 # ── STEP 6: Deploy Backend ────────────────────────────────────────────────────
 # Click "Deploy" in Railway
@@ -68,8 +77,9 @@ CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
 # 5. Add Environment Variables:
 NEXT_PUBLIC_API_URL=https://<your-railway-backend-url>
 NEXT_PUBLIC_WS_URL=https://<your-railway-backend-url>
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_d2l0dHktbW91c2UtMjUuY2xlcmsuYWNjb3VudHMuZGV2JA
-CLERK_SECRET_KEY=sk_test_fJNZWfsXPeHew1fVkOc5aBApQqYTNSqT8ff61ycBIk
+NEXT_PUBLIC_ALLOW_SIGN_UP=false   # invite-only; also enable Restricted mode in Clerk dashboard
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_publishable_key
+CLERK_SECRET_KEY=sk_test_your_clerk_secret_key   # never commit real keys
 # 6. Click "Deploy"
 
 # ── STEP 8: Update FRONTEND_URL in Railway Backend ───────────────────────────

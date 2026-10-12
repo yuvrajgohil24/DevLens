@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import crypto from 'crypto';
 import { promisify } from 'util';
 import path from 'path';
+import fs from 'fs';
 import { pathToFileURL } from 'url';
 
 const execAsync = promisify(exec);
@@ -38,10 +39,25 @@ export function sanitizeTruffleHogFinding(data: any) {
 }
 
 /**
+ * Finds the TruffleHog binary:
+ *   1. TRUFFLEHOG_BIN env override
+ *   2. A local ./bin/trufflehog(.exe) (Windows dev setup)
+ *   3. `trufflehog` on PATH (Docker image installs it to /usr/local/bin)
+ */
+export function resolveTruffleHogBin(): string {
+  if (process.env.TRUFFLEHOG_BIN) return process.env.TRUFFLEHOG_BIN;
+
+  const localBin = path.resolve(process.cwd(), 'bin', process.platform === 'win32' ? 'trufflehog.exe' : 'trufflehog');
+  if (fs.existsSync(localBin)) return localBin;
+
+  return 'trufflehog';
+}
+
+/**
  * Runs TruffleHog scanner on the provided git repository path.
  */
 export async function runTruffleHog(repoPath: string): Promise<string> {
-  const truffleHogBin = path.resolve(process.cwd(), 'bin', 'trufflehog.exe');
+  const truffleHogBin = resolveTruffleHogBin();
 
   // FIX: TruffleHog's `git` subcommand does NOT accept Windows backslash paths
   // like C:\Users\... It needs either:
@@ -82,9 +98,10 @@ export async function runTruffleHog(repoPath: string): Promise<string> {
       console.log(`✅ [TRUFFLEHOG] Scan complete (secrets found in output)`);
       return err.stdout;
     }
-    // Real error — binary missing, permissions, etc.
+    // Real error — binary missing, permissions, etc. Fail the scan instead of
+    // returning '' so a broken scanner is never reported as "0 secrets found".
     console.error(`❌ [TRUFFLEHOG] Critical error:`, err.stderr || err.message);
-    return '';
+    throw new Error(`TruffleHog scan failed (binary: ${truffleHogBin}): ${String(err.stderr || err.message).slice(0, 500)}`);
   }
 }
 

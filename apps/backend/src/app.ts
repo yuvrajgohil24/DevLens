@@ -57,6 +57,7 @@ app.get('/health', (_req, res) => {
 import { protectRoute } from './middleware/auth';
 import { blockDemoWrites } from './middleware/demoGuard';
 import { verifyWebhookSignature } from './middleware/webhookSignature';
+import { requireAdminForWrites, getCurrentUser } from './middleware/roles';
 
 // Public /api/ routes that must NOT require a Clerk session.
 const isPublicApi = (path: string) =>
@@ -78,11 +79,22 @@ app.use((req, res, next) => {
   next();
 });
 
+// Write actions require the admin role; everyone else is read-only
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') && !isPublicApi(req.path)) {
+    return requireAdminForWrites(req, res, next);
+  }
+  next();
+});
+
 // ── Webhooks ───────────────────────────────────────────────
 app.post('/api/webhooks/pipeline', verifyWebhookSignature, handlePipelineWebhook);
 
 // ── Demo / Guest session (public) ──────────────────────────
 app.post('/api/demo/session', createDemoSession);
+
+// ── Current user / permissions ─────────────────────────────
+app.get('/api/me', getCurrentUser);
 
 // ── Dashboard ──────────────────────────────────────────────
 app.get('/api/dashboard/overview', getOverview);

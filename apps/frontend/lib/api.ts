@@ -57,6 +57,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ── Dashboard ──────────────────────────────────────────────
 export const api = {
+  me: () => apiFetch<CurrentUser>('/api/me'),
+
   dashboard: {
     overview: () => apiFetch<DashboardOverview>('/api/dashboard/overview'),
   },
@@ -114,6 +116,13 @@ export const api = {
 };
 
 // ── Types ──────────────────────────────────────────────────
+export interface CurrentUser {
+  userId: string;
+  role: 'admin' | 'viewer';
+  canWrite: boolean;
+  localGitEnabled: boolean;
+}
+
 export interface DashboardOverview {
   totalDeployments: number;
   activeDeployments: number;
@@ -165,8 +174,10 @@ export interface Vulnerability {
   scannerSource: string | null;
   isResolved: boolean;
   detectedAt: string;
+  resolvedAt?: string | null;
   service?: { id: string; name: string };
   deployment?: { id: string; commitSha: string; branch: string | null; environment: string | null };
+  scan?: { isMock: boolean };
 }
 
 export interface RiskScore {

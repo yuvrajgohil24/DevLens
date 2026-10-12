@@ -15,6 +15,7 @@ export async function listVulnerabilities(req: Request, res: Response) {
       include: {
         service: { select: { id: true, name: true } },
         deployment: { select: { id: true, commitSha: true, branch: true, environment: true } },
+        scan: { select: { isMock: true } },
       },
       orderBy: [{ severity: 'asc' }, { cvssScore: 'desc' }, { detectedAt: 'desc' }],
       take: limit ? parseInt(limit as string, 10) : 100,
@@ -42,7 +43,7 @@ export async function resolveVulnerability(req: Request, res: Response) {
     const { id } = req.params;
     const vuln = await prisma.vulnerability.update({
       where: { id },
-      data: { isResolved: true },
+      data: { isResolved: true, resolvedAt: new Date() },
     });
     return res.json(vuln);
   } catch (err) {

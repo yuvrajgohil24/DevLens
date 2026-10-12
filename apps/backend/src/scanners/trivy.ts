@@ -17,7 +17,7 @@ export interface NormalizedVulnerability {
   scannerSource: string;
 }
 
-// Realistic CVE pool — Phase 1 mock data
+// Sample CVE pool — returned (flagged isMock) only when Trivy is unavailable
 const CVE_POOL: NormalizedVulnerability[] = [
   {
     cveId: 'CVE-2024-21626',
@@ -111,9 +111,9 @@ const CVE_POOL: NormalizedVulnerability[] = [
   },
 ];
 
-import fs from 'fs';
+import { mockScannersAllowed, ScannerResult } from './mock';
 
-export async function runTrivy(targetPath: string): Promise<unknown> {
+export async function runTrivy(targetPath: string): Promise<ScannerResult> {
   // Try to find trivy in common locations
   const trivyPaths = [
     process.env.TRIVY_BIN, // Allow override via .env
@@ -121,35 +121,44 @@ export async function runTrivy(targetPath: string): Promise<unknown> {
     'trivy.exe',
   ].filter(Boolean) as string[];
 
+  let lastError = '';
   for (const trivyBin of trivyPaths) {
     const command = `"${trivyBin}" fs --format json "${targetPath}"`;
     try {
       console.log(`🔍 [TRIVY] Trying: ${trivyBin}`);
       const { stdout } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10 });
       console.log(`✅ [TRIVY] Real scan complete`);
-      return JSON.parse(stdout);
-    } catch {
+      return { output: JSON.parse(stdout), isMock: false };
+    } catch (err: any) {
+      lastError = String(err?.stderr || err?.message || err).slice(0, 500);
       // Try next path
     }
   }
 
-  // Fallback: trivy not available — return realistic mock data so pipeline completes
-  console.warn('⚠️ [TRIVY] Binary not found — using mock CVE data for pipeline completion');
+  if (!mockScannersAllowed()) {
+    throw new Error(`Trivy scan failed and mock data is disabled (MOCK_SCANNERS): ${lastError}`);
+  }
+
+  // Fallback: trivy not available — return the sample CVE pool, flagged as mock
+  console.warn('⚠️ [TRIVY] Binary not found — using MOCK CVE data (results are labelled as mock)');
   return {
-    Results: [
-      {
-        Target: targetPath,
-        Vulnerabilities: CVE_POOL.slice(0, Math.floor(Math.random() * CVE_POOL.length)).map(v => ({
-          VulnerabilityID: v.cveId,
-          Title: v.title,
-          Severity: v.severity.toUpperCase(),
-          PkgName: v.affectedPackage.split('@')[0],
-          InstalledVersion: v.affectedPackage.split('@')[1],
-          FixedVersion: v.fixedVersion,
-          CVSS: { nvd: { V3Score: v.cvssScore } },
-        })),
-      },
-    ],
+    isMock: true,
+    output: {
+      Results: [
+        {
+          Target: targetPath,
+          Vulnerabilities: CVE_POOL.map(v => ({
+            VulnerabilityID: v.cveId,
+            Title: v.title,
+            Severity: v.severity.toUpperCase(),
+            PkgName: v.affectedPackage.split('@')[0],
+            InstalledVersion: v.affectedPackage.split('@')[1],
+            FixedVersion: v.fixedVersion,
+            CVSS: { nvd: { V3Score: v.cvssScore } },
+          })),
+        },
+      ],
+    },
   };
 }
 

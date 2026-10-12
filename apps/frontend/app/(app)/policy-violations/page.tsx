@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api, PolicyViolation } from '@/lib/api';
-import { useDemoMode } from '@/lib/demo';
+import { usePermissions } from '@/lib/permissions';
 import { useWebSocket } from '@/components/providers/WebSocketProvider';
 import { AlertTriangle, CheckCircle2, ShieldX, KeyRound, Package } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -24,7 +24,8 @@ export default function PolicyViolationsPage() {
   const [loading, setLoading] = useState(true);
   const [showResolved, setShowResolved] = useState(false);
   const { lastScan } = useWebSocket();
-  const isDemo = useDemoMode();
+  const { canWrite } = usePermissions();
+  const readOnly = !canWrite;
 
   const load = async () => {
     setLoading(true);
@@ -37,7 +38,7 @@ export default function PolicyViolationsPage() {
   useEffect(() => { if (lastScan) load(); }, [lastScan]);
 
   const handleResolve = async (id: string) => {
-    if (isDemo) return; // read-only demo
+    if (readOnly) return; // viewers (incl. demo) are read-only
     await api.policyViolations.resolve(id);
     load();
   };
@@ -97,13 +98,13 @@ export default function PolicyViolationsPage() {
                   </div>
                 </div>
                 {!v.isResolved && (
-                  <button onClick={()=>handleResolve(v.id)} disabled={isDemo}
-                    title={isDemo ? 'Disabled in demo mode' : undefined} style={{
+                  <button onClick={()=>handleResolve(v.id)} disabled={readOnly}
+                    title={readOnly ? 'Read-only access — admin role required' : undefined} style={{
                     display:'flex', alignItems:'center', gap:4,
                     background:'var(--success-bg)', color:'var(--success)',
                     border:'1px solid rgba(52,211,153,0.25)', borderRadius:6,
-                    padding:'6px 12px', cursor:isDemo?'not-allowed':'pointer',
-                    opacity:isDemo?0.45:1, fontSize:'0.78rem', fontWeight:600, flexShrink:0,
+                    padding:'6px 12px', cursor:readOnly?'not-allowed':'pointer',
+                    opacity:readOnly?0.45:1, fontSize:'0.78rem', fontWeight:600, flexShrink:0,
                   }}>
                     <CheckCircle2 size={12}/> Resolve
                   </button>

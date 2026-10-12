@@ -27,5 +27,6 @@
     "lodash": "^4.17.21",
     "react": "19.2.4",
     "react-dom": "19.2.4"
-  }
+  },
+  "packageManager": "yarn@1.22.21+sha1.1959a18351b811cdeedbd484a8f86c3cc3bbaf72"
 }

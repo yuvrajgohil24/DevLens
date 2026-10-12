@@ -1,30 +1,36 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { NormalizedVulnerability } from './trivy';
+import { mockScannersAllowed, ScannerResult } from './mock';
 
 const execAsync = promisify(exec);
 
-export async function runSnyk(targetPath: string): Promise<unknown> {
+export async function runSnyk(targetPath: string): Promise<ScannerResult> {
   const snykToken = process.env.SNYK_TOKEN;
-  
+
   if (!snykToken) {
-    console.warn('⚠️ [SNYK] SNYK_TOKEN not found in environment. Falling back to mock data.');
-    return getMockSnykData();
+    if (mockScannersAllowed()) {
+      console.warn('⚠️ [SNYK] SNYK_TOKEN not set — using MOCK data (results are labelled as mock)');
+      return { output: await getMockSnykData(), isMock: true };
+    }
+    // Snyk is optional: without a token it simply doesn't run
+    console.warn('⚠️ [SNYK] SNYK_TOKEN not set — skipping Snyk scan');
+    return { output: null, isMock: false, skipped: true };
   }
 
   // Use npx to run the locally installed Snyk CLI
   const command = `npx snyk test --json --all-projects "${targetPath}"`;
-  
+
   try {
     console.log(`🔍 [SNYK] Running real SCA scan on: ${targetPath}`);
     // Passing the SNYK_TOKEN via environment variables
-    const { stdout } = await execAsync(command, { 
+    const { stdout } = await execAsync(command, {
       maxBuffer: 1024 * 1024 * 10,
       env: { ...process.env, SNYK_TOKEN: snykToken }
     });
-    
+
     console.log(`✅ [SNYK] Real scan complete (No vulnerabilities found)`);
-    return JSON.parse(stdout);
+    return { output: JSON.parse(stdout), isMock: false };
   } catch (err: any) {
     // Snyk CLI exits with code 1 if vulnerabilities are found, and code 2 for errors.
     // However, stdout will still contain the JSON payload if it's code 1.
@@ -32,15 +38,18 @@ export async function runSnyk(targetPath: string): Promise<unknown> {
       try {
         const parsed = JSON.parse(err.stdout);
         console.log(`✅ [SNYK] Real scan complete (Vulnerabilities found)`);
-        return parsed;
+        return { output: parsed, isMock: false };
       } catch (parseErr) {
         console.error('⚠️ [SNYK] Failed to parse Snyk JSON output from error:', parseErr);
       }
     }
-    
+
     console.error(`❌ [SNYK] Real scan execution failed:`, err.message);
-    console.warn('⚠️ [SNYK] Falling back to mock data due to execution error.');
-    return getMockSnykData();
+    if (!mockScannersAllowed()) {
+      throw new Error(`Snyk scan failed and mock data is disabled (MOCK_SCANNERS): ${String(err.message).slice(0, 500)}`);
+    }
+    console.warn('⚠️ [SNYK] Falling back to MOCK data due to execution error.');
+    return { output: await getMockSnykData(), isMock: true };
   }
 }
 

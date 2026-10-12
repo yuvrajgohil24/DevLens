@@ -2,7 +2,7 @@
  * Unit tests for the TruffleHog scanner parser (parseTruffleHogOutput).
  */
 
-import { parseTruffleHogOutput } from '../scanners/truffleHog';
+import { parseTruffleHogOutput, resolveTruffleHogBin, runTruffleHog } from '../scanners/truffleHog';
 
 describe('parseTruffleHogOutput', () => {
   it('should return an empty array for empty or whitespace string', () => {
@@ -110,5 +110,30 @@ describe('parseTruffleHogOutput', () => {
     expect(finding.rawFinding).not.toHaveProperty('ExtraData');
     expect(finding.rawFinding.fingerprint).toMatch(/^[0-9a-f]{16}$/);
     expect(finding.file).toBe('.env');
+  });
+});
+
+describe('resolveTruffleHogBin / runTruffleHog', () => {
+  const original = process.env.TRUFFLEHOG_BIN;
+  afterEach(() => {
+    if (original === undefined) delete process.env.TRUFFLEHOG_BIN;
+    else process.env.TRUFFLEHOG_BIN = original;
+  });
+
+  it('prefers the TRUFFLEHOG_BIN override', () => {
+    process.env.TRUFFLEHOG_BIN = '/opt/custom/trufflehog';
+    expect(resolveTruffleHogBin()).toBe('/opt/custom/trufflehog');
+  });
+
+  it('falls back to a bin/ binary or trufflehog on PATH (never a hardcoded .exe on Linux)', () => {
+    delete process.env.TRUFFLEHOG_BIN;
+    const bin = resolveTruffleHogBin();
+    expect(bin === 'trufflehog' || /bin[\/]trufflehog(\.exe)?$/.test(bin)).toBe(true);
+    if (process.platform !== 'win32') expect(bin).not.toMatch(/\.exe$/);
+  });
+
+  it('throws instead of reporting 0 secrets when the binary is missing', async () => {
+    process.env.TRUFFLEHOG_BIN = 'definitely-not-a-real-trufflehog-binary';
+    await expect(runTruffleHog(process.cwd())).rejects.toThrow(/TruffleHog scan failed/);
   });
 });

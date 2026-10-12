@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import { api, Deployment } from '@/lib/api';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { MockBadge } from '@/components/ui/MockBadge';
 import { RiskScoreBadge } from '@/components/ui/RiskScoreBadge';
 import { SeverityBadge } from '@/components/ui/StatusBadge';
 import { ArrowLeft, GitCommit, Rocket, Shield, ExternalLink } from 'lucide-react';
@@ -11,7 +12,7 @@ import { format } from 'date-fns';
 
 export default function DeploymentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [dep, setDep] = useState<Deployment & { scans?: { id:string; scannerType:string; status:string; vulnerabilities:{severity:string;cveId:string;title:string;cvssScore:number;affectedPackage:string}[] }[] } | null>(null);
+  const [dep, setDep] = useState<Deployment & { scans?: { id:string; scannerType:string; status:string; isMock?:boolean; vulnerabilities:{severity:string;cveId:string;title:string;cvssScore:number;affectedPackage:string}[] }[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ id:
   if (!dep) return <div style={{ padding:40, color:'var(--critical)' }}>Deployment not found.</div>;
 
   const risk = dep.riskScores?.[0]?.score;
-  const scansList = (dep as { scans?: { id:string; scannerType:string; status:string; vulnerabilities:{severity:string;cveId:string;title:string;cvssScore:number|null;affectedPackage:string|null}[], secrets:{type:string;file:string|null;line:number|null;isVerified:boolean}[] }[] }).scans ?? [];
+  const scansList = (dep as { scans?: { id:string; scannerType:string; status:string; isMock?:boolean; vulnerabilities:{severity:string;cveId:string;title:string;cvssScore:number|null;affectedPackage:string|null}[], secrets:{type:string;file:string|null;line:number|null;isVerified:boolean}[] }[] }).scans ?? [];
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
@@ -82,6 +83,7 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ id:
             <Shield size={14} color="var(--primary)" />
             <span style={{ fontWeight:600, fontSize:'0.875rem' }}>{scan.scannerType?.toUpperCase()} Scan</span>
             <StatusBadge status={scan.status} />
+            {scan.isMock && <MockBadge />}
             <span style={{ fontSize:'0.78rem', color:'var(--text-muted)', marginLeft:'auto' }}>{(scan.vulnerabilities?.length ?? 0) + (scan.secrets?.length ?? 0)} findings</span>
           </div>
           {scan.vulnerabilities?.length > 0 && (

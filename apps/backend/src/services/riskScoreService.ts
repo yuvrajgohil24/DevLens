@@ -14,11 +14,12 @@ export async function calculateRiskScore(deploymentId: string, serviceId: string
   const [vulnGroups, secretCount] = await Promise.all([
     prisma.vulnerability.groupBy({
       by: ['severity'],
-      where: { deploymentId, isResolved: false },
+      // Mock (sample) findings never count towards a real risk score
+      where: { deploymentId, isResolved: false, scan: { isMock: false } },
       _count: { id: true },
     }),
     prisma.secret.count({
-      where: { deploymentId },
+      where: { deploymentId, scan: { isMock: false } },
     })
   ]);
 

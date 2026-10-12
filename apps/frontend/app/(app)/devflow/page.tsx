@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api, Branch, Commit } from '@/lib/api';
+import { usePermissions } from '@/lib/permissions';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
   GitBranch, GitCommit, Rocket, CheckCircle2,
@@ -27,6 +28,9 @@ interface GitHubRepo {
 }
 
 export default function DevFlowPage() {
+  const { canWrite, localGitEnabled } = usePermissions();
+  const canRunGit = canWrite && localGitEnabled;
+  const readOnlyTitle = 'Read-only access — admin role required';
   const [repos, setRepos]                   = useState<GitHubRepo[]>([]);
   const [loadingRepos, setLoadingRepos]     = useState(true);
   const [repoError, setRepoError]           = useState<string | null>(null);
@@ -129,7 +133,7 @@ export default function DevFlowPage() {
   }, [selectedRepo, loadGitStatus]);
 
   const handleGitAction = async (action: 'push' | 'pull' | 'fetch') => {
-    if (!selectedRepo) return;
+    if (!selectedRepo || !canRunGit) return;
     setLoadingGit(true);
     setGitOutput(`Running git ${action}...`);
     try {
@@ -145,6 +149,7 @@ export default function DevFlowPage() {
 
   // ── Deploy handler ──────────────────────────────────────────
   const handleDeploy = async (commitSha?: string, commitMsg?: string) => {
+    if (!canWrite) return;
     setDeploying(true);
     setDeployResult(null);
     setDeployStatus('Triggering deployment…');
@@ -302,15 +307,16 @@ export default function DevFlowPage() {
           {/* Deploy button */}
           <button
             onClick={() => handleDeploy()}
-            disabled={deploying || !selectedRepo}
+            disabled={deploying || !selectedRepo || !canWrite}
+            title={!canWrite ? readOnlyTitle : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               background: deploying ? 'rgba(129,140,248,0.1)' : 'linear-gradient(135deg,var(--primary),var(--accent))',
               color: '#fff', border: 'none', borderRadius: 8,
-              padding: '9px 20px', cursor: (deploying || !selectedRepo) ? 'not-allowed' : 'pointer',
+              padding: '9px 20px', cursor: (deploying || !selectedRepo || !canWrite) ? 'not-allowed' : 'pointer',
               fontSize: '0.875rem', fontWeight: 700,
               boxShadow: deploying ? 'none' : '0 0 20px var(--primary-glow)',
-              transition: 'all 0.2s', opacity: (deploying || !selectedRepo) ? 0.7 : 1,
+              transition: 'all 0.2s', opacity: !canWrite ? 0.5 : (deploying || !selectedRepo) ? 0.7 : 1,
             }}
           >
             {deploying ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
@@ -352,36 +358,42 @@ export default function DevFlowPage() {
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button
               onClick={() => handleGitAction('fetch')}
-              disabled={loadingGit || !selectedRepo}
+              disabled={loadingGit || !selectedRepo || !canRunGit}
+              title={!localGitEnabled ? 'Local git actions are disabled on this server' : !canWrite ? readOnlyTitle : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 background: 'var(--surface-2)', border: '1px solid var(--border)',
                 color: 'var(--text-primary)', borderRadius: 8, padding: '8px 16px',
-                cursor: loadingGit ? 'not-allowed' : 'pointer', fontSize: '0.85rem',
+                cursor: (loadingGit || !canRunGit) ? 'not-allowed' : 'pointer', fontSize: '0.85rem',
+                opacity: canRunGit ? 1 : 0.5,
               }}
             >
               <RefreshCw size={14} className={loadingGit ? 'animate-spin' : ''} /> Fetch
             </button>
             <button
               onClick={() => handleGitAction('pull')}
-              disabled={loadingGit || !selectedRepo}
+              disabled={loadingGit || !selectedRepo || !canRunGit}
+              title={!localGitEnabled ? 'Local git actions are disabled on this server' : !canWrite ? readOnlyTitle : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
                 color: '#10b981', borderRadius: 8, padding: '8px 16px',
-                cursor: loadingGit ? 'not-allowed' : 'pointer', fontSize: '0.85rem',
+                cursor: (loadingGit || !canRunGit) ? 'not-allowed' : 'pointer', fontSize: '0.85rem',
+                opacity: canRunGit ? 1 : 0.5,
               }}
             >
               <Download size={14} /> Pull
             </button>
             <button
               onClick={() => handleGitAction('push')}
-              disabled={loadingGit || !selectedRepo}
+              disabled={loadingGit || !selectedRepo || !canRunGit}
+              title={!localGitEnabled ? 'Local git actions are disabled on this server' : !canWrite ? readOnlyTitle : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)',
                 color: '#3b82f6', borderRadius: 8, padding: '8px 16px',
-                cursor: loadingGit ? 'not-allowed' : 'pointer', fontSize: '0.85rem',
+                cursor: (loadingGit || !canRunGit) ? 'not-allowed' : 'pointer', fontSize: '0.85rem',
+                opacity: canRunGit ? 1 : 0.5,
               }}
             >
               <Upload size={14} /> Push
@@ -530,13 +542,14 @@ export default function DevFlowPage() {
                 </div>
                 <button
                   onClick={() => handleDeploy(c.sha, c.message)}
-                  disabled={deploying}
+                  disabled={deploying || !canWrite}
+                  title={!canWrite ? readOnlyTitle : undefined}
                   style={{
                     flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
                     background: 'rgba(129,140,248,0.1)', color: 'var(--primary)',
                     border: '1px solid rgba(129,140,248,0.25)', borderRadius: 5,
-                    padding: '5px 10px', cursor: deploying ? 'not-allowed' : 'pointer',
-                    fontSize: '0.75rem', fontWeight: 600, opacity: deploying ? 0.5 : 1,
+                    padding: '5px 10px', cursor: (deploying || !canWrite) ? 'not-allowed' : 'pointer',
+                    fontSize: '0.75rem', fontWeight: 600, opacity: (deploying || !canWrite) ? 0.5 : 1,
                     transition: 'all 0.15s',
                   }}
                 >

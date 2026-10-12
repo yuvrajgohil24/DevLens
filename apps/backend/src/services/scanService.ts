@@ -11,13 +11,25 @@ export async function createScan(deploymentId: string, scannerType: string = 'tr
   });
 }
 
-export async function completeScan(id: string, rawOutput: unknown) {
+export async function completeScan(id: string, rawOutput: unknown, isMock = false) {
   return prisma.scan.update({
     where: { id },
     data: {
       status: 'completed',
       completedAt: new Date(),
       rawOutput: rawOutput as never,
+      isMock,
+    },
+  });
+}
+
+export async function skipScan(id: string, reason: string) {
+  return prisma.scan.update({
+    where: { id },
+    data: {
+      status: 'skipped',
+      completedAt: new Date(),
+      rawOutput: { skipped: reason } as never,
     },
   });
 }

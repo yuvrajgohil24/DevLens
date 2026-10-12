@@ -58,6 +58,7 @@ model Scan {
   startedAt    DateTime? @map("started_at")
   completedAt  DateTime? @map("completed_at")
   rawOutput    Json?     @map("raw_output")
+  isMock       Boolean   @default(false) @map("is_mock") // true when the scanner was unavailable and sample data was used
 
   deployment      Deployment      @relation(fields: [deploymentId], references: [id])
   vulnerabilities Vulnerability[]
@@ -80,6 +81,7 @@ model Vulnerability {
   scannerSource   String?  @map("scanner_source") @db.VarChar(50)
   isResolved      Boolean  @default(false) @map("is_resolved")
   detectedAt      DateTime @default(now()) @map("detected_at")
+  resolvedAt      DateTime? @map("resolved_at")
 
   scan       Scan       @relation(fields: [scanId], references: [id])
   deployment Deployment @relation(fields: [deploymentId], references: [id])

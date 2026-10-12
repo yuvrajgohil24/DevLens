@@ -12,6 +12,7 @@ import {
   resolveRepo,
 } from '../services/githubService';
 import { branchSchema, commitShaSchema, REPO_NAME_REGEX } from '../utils/validation';
+import { localGitActionsEnabled } from '../middleware/roles';
 
 const TriggerDeploySchema = z.object({
   branch: branchSchema.default('main'),
@@ -180,6 +181,9 @@ import { getGitStatus, gitFetch, gitPull, gitPush } from '../services/gitService
 
 // GET /api/devflow/repos/:repoId/git/status
 export async function getLocalGitStatus(req: Request, res: Response) {
+  if (!localGitActionsEnabled()) {
+    return res.json({ success: false, message: 'Local git features are disabled on this server (LOCAL_GIT_ACTIONS).' });
+  }
   try {
     const repoName = resolveRepoParam(req, res);
     if (!repoName) return;
@@ -199,6 +203,9 @@ export async function getLocalGitStatus(req: Request, res: Response) {
 
 // POST /api/devflow/repos/:repoId/git/action
 export async function executeGitAction(req: Request, res: Response) {
+  if (!localGitActionsEnabled()) {
+    return res.status(403).json({ error: 'Local git actions are disabled on this server. Set LOCAL_GIT_ACTIONS=true for local development only.' });
+  }
   try {
     const { action } = req.body;
     const repoName = resolveRepoParam(req, res);

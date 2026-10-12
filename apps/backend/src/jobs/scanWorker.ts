@@ -3,7 +3,7 @@ import IORedis from 'ioredis';
 import { runTrivy, parseTrivyOutput } from '../scanners/trivy';
 import { runTruffleHog, parseTruffleHogOutput } from '../scanners/truffleHog';
 import { runSnyk, parseSnykOutput } from '../scanners/snyk';
-import { createScan, completeScan, failScan, insertVulnerabilities, insertSecrets } from '../services/scanService';
+import { createScan, completeScan, failScan, skipScan, insertVulnerabilities, insertSecrets } from '../services/scanService';
 import { calculateRiskScore } from '../services/riskScoreService';
 import { updateDeploymentStatus } from '../services/deploymentService';
 import { wsEvents } from '../websocket/index';
@@ -66,24 +66,35 @@ const worker = new Worker<ScanJobData>(
         console.log(`📡 [WORKER] Orchestrating Scans for ${service_name}...`);
         
         // --- TRIVY (CVEs) ---
-        const trivyOutput = await runTrivy(scanTargetPath);
-        const parsedTrivyVulns = parseTrivyOutput(trivyOutput);
+        const trivy = await runTrivy(scanTargetPath);
+        const parsedTrivyVulns = parseTrivyOutput(trivy.output);
         await insertVulnerabilities(
           parsedTrivyVulns.map(v => ({ ...v, scanId: trivyScan.id, deploymentId: deployment_id, serviceId: service_id }))
         );
-        await completeScan(trivyScan.id, trivyOutput);
+        await completeScan(trivyScan.id, trivy.output, trivy.isMock);
 
         // --- SNYK (SCA) ---
-        // runSnyk() will use SNYK_TOKEN if available, otherwise fallback to mock data.
-        const snykOutput = await runSnyk(scanTargetPath);
-        const parsedSnykVulns = parseSnykOutput(snykOutput);
-        await insertVulnerabilities(
-          parsedSnykVulns.map(v => ({ ...v, scanId: snykScan.id, deploymentId: deployment_id, serviceId: service_id }))
-        );
-        await completeScan(snykScan.id, snykOutput);
+        // Real scan with SNYK_TOKEN; otherwise mock data (dev) or skipped (MOCK_SCANNERS=false / production).
+        const snyk = await runSnyk(scanTargetPath);
+        const parsedSnykVulns = snyk.skipped ? [] : parseSnykOutput(snyk.output);
+        if (snyk.skipped) {
+          await skipScan(snykScan.id, 'SNYK_TOKEN not configured');
+        } else {
+          await insertVulnerabilities(
+            parsedSnykVulns.map(v => ({ ...v, scanId: snykScan.id, deploymentId: deployment_id, serviceId: service_id }))
+          );
+          await completeScan(snykScan.id, snyk.output, snyk.isMock);
+        }
 
-        // Combine vulnerabilities
-        const parsedVulns = [...parsedTrivyVulns, ...parsedSnykVulns];
+        // Only real (non-mock) findings decide the policy outcome
+        const parsedVulns = [
+          ...(trivy.isMock ? [] : parsedTrivyVulns),
+          ...(snyk.isMock ? [] : parsedSnykVulns),
+        ];
+        const usedMockData = trivy.isMock || snyk.isMock;
+        if (usedMockData) {
+          console.warn(`⚠️ [POLICY] Mock scanner data was used — it is excluded from the policy decision and risk score`);
+        }
 
         // --- TRUFFLEHOG (Secrets) ---
         const truffleOutput = await runTruffleHog(scanTargetPath);
@@ -147,7 +158,8 @@ const worker = new Worker<ScanJobData>(
             details: {
               'Deployment ID': deployment_id,
               'Risk Score': riskScore.score.toString(),
-              'Total CVEs': parsedVulns.length.toString()
+              'Total CVEs': parsedVulns.length.toString(),
+              ...(usedMockData && { 'Note': 'Some scanners were unavailable — mock data was used and ignored' }),
             }
           });
         }

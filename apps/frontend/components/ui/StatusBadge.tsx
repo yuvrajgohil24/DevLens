@@ -8,6 +8,7 @@ const STATUS_MAP: Record<string, { color: string; bg: string; border: string; do
   running:   { color: 'var(--primary)',  bg: 'var(--primary-glow)', border: 'rgba(59,130,246,0.3)', dot: 'var(--primary)' },
   pending:   { color: 'var(--medium)',   bg: 'var(--medium-bg)',   border: 'rgba(234,179,8,0.3)',  dot: 'var(--medium)' },
   completed: { color: 'var(--success)',  bg: 'var(--success-bg)',  border: 'rgba(16,185,129,0.3)',  dot: 'var(--success)' },
+  skipped:   { color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.04)', border: 'var(--border)', dot: 'var(--text-muted)' },
   queued:    { color: 'var(--text-secondary)', bg: 'rgba(255,255,255,0.06)', border: 'var(--border)', dot: 'var(--text-muted)' },
 };
 

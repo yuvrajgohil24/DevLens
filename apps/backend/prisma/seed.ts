@@ -56,6 +56,13 @@ function calcScore(c: number, h: number, m: number, l: number): number {
   return Math.min(10, Math.round((w / total) * 2.5 * 10) / 10);
 }
 
+// ~40% of sample vulns are resolved 2-96 hours after detection, so MTTR has data to show
+function resolution(detectedAt: Date) {
+  if (Math.random() > 0.4) return { isResolved: false, resolvedAt: null };
+  const hours = 2 + Math.random() * 94;
+  return { isResolved: true, resolvedAt: new Date(detectedAt.getTime() + hours * 3600_000) };
+}
+
 async function main() {
   console.log('🌱 Seeding DevLens database with REALISTIC data...');
 
@@ -112,6 +119,7 @@ async function main() {
           startedAt: triggeredAt,
           completedAt,
           rawOutput: { mock: true } as never,
+          isMock: true, // seeded sample data — labelled as such in the UI
         },
       });
 
@@ -135,7 +143,7 @@ async function main() {
             affectedPackage: v.affectedPackage,
             fixedVersion: v.fixedVersion,
             scannerSource: 'trivy',
-            isResolved: Math.random() > 0.6,
+            ...resolution(triggeredAt),
             detectedAt: triggeredAt,
           },
         });

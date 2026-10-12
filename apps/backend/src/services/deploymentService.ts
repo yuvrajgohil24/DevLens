@@ -63,6 +63,7 @@ export async function getDeploymentById(id: string) {
           id: true,
           scannerType: true,
           status: true,
+          isMock: true,
           startedAt: true,
           completedAt: true,
           vulnerabilities: true,
