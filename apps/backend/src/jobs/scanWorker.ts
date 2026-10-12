@@ -3,13 +3,13 @@ import IORedis from 'ioredis';
 import { runTrivy, parseTrivyOutput } from '../scanners/trivy';
 import { runTruffleHog, parseTruffleHogOutput } from '../scanners/truffleHog';
 import { runSnyk, parseSnykOutput } from '../scanners/snyk';
-import { createScan, completeScan, failScan, skipScan, insertVulnerabilities, insertSecrets } from '../services/scanService';
+import { createScan, completeScan, failScan, skipScan, insertVulnerabilities, insertSecrets, clearScanResults } from '../services/scanService';
 import { calculateRiskScore } from '../services/riskScoreService';
-import { updateDeploymentStatus } from '../services/deploymentService';
+import { evaluatePolicy, recordPolicyViolations } from '../services/policyService';
+import { applyDeploymentStatus } from '../services/deploymentService';
 import { wsEvents } from '../websocket/index';
 import { cloneRepository, cleanupDirectory } from '../utils/git';
 import { sendSlackAlert } from '../services/slackService';
-import prisma from '../db/prisma';
 import path from 'path';
 import os from 'os';
 interface ScanJobData {
@@ -35,10 +35,9 @@ const worker = new Worker<ScanJobData>(
     const { deployment_id, service_id, service_name, image_name, repo_url, environment } = job.data;
     console.log(`\n🔬 Starting scan job [${job.id}] for ${image_name}`);
 
-    // 0. Idempotency: Clean up any partial scans/data if this job is a retry
-    await prisma.vulnerability.deleteMany({ where: { deploymentId: deployment_id } });
-    await prisma.secret.deleteMany({ where: { deploymentId: deployment_id } });
-    await prisma.scan.deleteMany({ where: { deploymentId: deployment_id } });
+    // 0. Idempotency: if this job is a retry, remove everything a previous attempt
+    //    may have written for this deployment (atomically, children before scans)
+    await clearScanResults(deployment_id);
 
     // 1. Create scan records
     const trivyScan = await createScan(deployment_id, 'trivy');
@@ -46,7 +45,7 @@ const worker = new Worker<ScanJobData>(
     const snykScan = await createScan(deployment_id, 'snyk');
     try {
       // 2. Update deployment to running
-      await updateDeploymentStatus(deployment_id, 'running');
+      await applyDeploymentStatus(deployment_id, { scanStatus: 'running' });
 
       let scanTargetPath = '';
       let isTemp = false;
@@ -107,26 +106,19 @@ const worker = new Worker<ScanJobData>(
 
         // --- 5. POLICY ENGINE (Guardrails) ---
         console.log(`⚖️ [POLICY] Evaluating results...`);
+        const policy = evaluatePolicy(parsedVulns, parsedSecrets);
+        await recordPolicyViolations(deployment_id, service_id, policy.violations);
+        const finalStatus = policy.passed ? 'success' : 'failed';
         const criticalCveCount = parsedVulns.filter(v => v.severity === 'critical').length;
         const secretCount = parsedSecrets.length;
-
-        // Rule: FAIL on Critical CVEs OR ANY Secrets (User request)
-        let finalStatus = 'success';
-        let failureReason = '';
-
-        if (criticalCveCount > 0) {
-          finalStatus = 'failed';
-          failureReason = `Deployment blocked: ${criticalCveCount} Critical CVEs detected.`;
-        } else if (secretCount > 0) {
-          finalStatus = 'failed';
-          failureReason = `Deployment blocked: ${secretCount} Leaked Secrets detected in history.`;
-        }
 
         // 6. Calculate Risk Score
         const riskScore = await calculateRiskScore(deployment_id, service_id);
 
         // 7. Update final Deployment status
-        await updateDeploymentStatus(deployment_id, finalStatus, new Date());
+        // (overall status also depends on the CI build status reported by webhooks)
+        const updated = await applyDeploymentStatus(deployment_id, { scanStatus: finalStatus });
+        wsEvents.deploymentUpdated({ deploymentId: deployment_id, status: updated.status });
 
         // 8. Emit Events
         wsEvents.scanCompleted({
@@ -136,44 +128,30 @@ const worker = new Worker<ScanJobData>(
           riskScore: Number(riskScore.score),
         });
 
-        if (finalStatus === 'failed') {
-          console.warn(`🛑 [POLICY FAIL] ${failureReason}`);
-          await sendSlackAlert({
-            title: `🚨 Security Alert: ${service_name}`,
-            message: failureReason,
-            level: 'critical',
-            details: {
-              'Deployment ID': deployment_id,
-              'Risk Score': riskScore.score.toString(),
-              'Critical CVEs': criticalCveCount.toString(),
-              'Exposed Secrets': secretCount.toString(),
-            }
-          });
-        } else {
+        if (policy.passed) {
           console.log(`✅ [POLICY PASS] Deployment successful for ${service_name}`);
-          await sendSlackAlert({
-            title: `✅ Security Scan Passed: ${service_name}`,
-            message: `Deployment verified. No critical vulnerabilities or leaked secrets detected.`,
-            level: 'info',
-            details: {
-              'Deployment ID': deployment_id,
-              'Risk Score': riskScore.score.toString(),
-              'Total CVEs': parsedVulns.length.toString(),
-              ...(usedMockData && { 'Note': 'Some scanners were unavailable — mock data was used and ignored' }),
-            }
-          });
+        } else {
+          console.warn(`🛑 [POLICY FAIL] ${policy.reason}`);
         }
 
-        // 9. Send Slack Alert
+        // 9. Send ONE Slack alert per scan
         await sendSlackAlert({
           serviceName: service_name,
           environment: environment || 'staging',
-          status: finalStatus as 'success' | 'failed',
+          status: finalStatus,
           riskScore: Number(riskScore.score),
           criticalCount: criticalCveCount + secretCount,
           pipelineUrl: job.data.pipeline_url || job.data.repo_url || 'https://github.com/yuvrajgohil24/DevLens/actions',
           commitSha: job.data.commit_sha || 'unknown',
-          branch: job.data.branch || 'main'
+          branch: job.data.branch || 'main',
+          reason: policy.passed
+            ? 'No critical vulnerabilities or leaked secrets detected.'
+            : policy.reason,
+          details: {
+            'Total CVEs': parsedVulns.length.toString(),
+            'Leaked Secrets': secretCount.toString(),
+            ...(usedMockData && { Note: 'Some scanners were unavailable — mock data was used and ignored' }),
+          },
         });
 
       } finally {
@@ -183,21 +161,26 @@ const worker = new Worker<ScanJobData>(
       await failScan(trivyScan.id, String(err));
       await failScan(truffleScan.id, String(err));
       await failScan(snykScan.id, String(err));
-      await updateDeploymentStatus(deployment_id, 'failed', new Date());
+      // Retries re-run the whole scan; only the final attempt marks the deployment
+      // failed and alerts Slack, so one broken scan doesn't send three alerts.
+      const isFinalAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+      await applyDeploymentStatus(deployment_id, { scanStatus: isFinalAttempt ? 'failed' : 'queued' });
 
-      // Notify Slack about system failure
-      try {
-        await sendSlackAlert({
-          title: `❌ Scanner System Error: ${service_name}`,
-          message: `Security pipeline failed to execute: ${err.message || 'Unknown error during scan execution.'}`,
-          level: 'critical',
-          details: {
-            'Deployment ID': deployment_id,
-            'Job ID': job.id || 'unknown'
-          }
-        });
-      } catch (slackErr) {
-        console.error('Failed to send error alert to Slack:', slackErr);
+      if (isFinalAttempt) {
+        try {
+          await sendSlackAlert({
+            title: `❌ Scanner System Error: ${service_name}`,
+            message: `Security pipeline failed to execute: ${err.message || 'Unknown error during scan execution.'}`,
+            level: 'critical',
+            details: {
+              'Deployment ID': deployment_id,
+              'Job ID': job.id || 'unknown',
+              Attempts: String(job.attemptsMade + 1),
+            }
+          });
+        } catch (slackErr) {
+          console.error('Failed to send error alert to Slack:', slackErr);
+        }
       }
 
       throw err;

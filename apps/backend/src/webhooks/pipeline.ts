@@ -1,7 +1,12 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { getOrCreateService } from '../services/serviceService';
-import { createDeployment } from '../services/deploymentService';
+import {
+  createDeployment,
+  findDeploymentForCommit,
+  applyDeploymentStatus,
+  combineDeploymentStatus,
+} from '../services/deploymentService';
 import { scanQueue } from '../db/redis';
 import { wsEvents } from '../websocket/index';
 import { branchSchema, commitShaSchema, repoUrlSchema } from '../utils/validation';
@@ -44,32 +49,63 @@ export async function handlePipelineWebhook(req: Request, res: Response) {
     const service = await getOrCreateService(service_name, repo_url, language);
     console.log(`📦 Service: ${service.name} (${service.id.slice(0, 8)})`);
 
-    // 3. Create deployment record
+    // 3. CI sends several events per run (running → success/failed). Later events
+    //    update the existing deployment instead of creating (and scanning) a duplicate.
+    const existing = await findDeploymentForCommit(service.id, commit_sha, environment);
+    if (existing) {
+      const updated = await applyDeploymentStatus(
+        existing.id,
+        { ciStatus: status },
+        { pipelineUrl: pipeline_url, commitMessage: commit_message }
+      );
+      console.log(`🔁 CI status '${status}' recorded for deployment ${existing.id.slice(0, 8)} → ${updated.status}`);
+      try {
+        wsEvents.deploymentUpdated({ deploymentId: updated.id, status: updated.status });
+      } catch {
+        // WebSocket might not be ready in tests — non-fatal
+      }
+      return res.status(200).json({
+        received: true,
+        deployment_id: updated.id,
+        service_id: service.id,
+        duplicate: true,
+        message: `CI status updated for ${service_name}`,
+      });
+    }
+
+    // 4. First event for this commit: create the deployment and enqueue a scan
     const deployment = await createDeployment({
       serviceId: service.id,
       commitSha: commit_sha,
       commitMessage: commit_message,
       branch,
       author,
-      status,
+      ciStatus: status,
+      scanStatus: 'queued',
+      status: combineDeploymentStatus(status, 'queued'),
       environment,
       pipelineUrl: pipeline_url,
     });
     console.log(`🚀 Deployment created: ${deployment.id.slice(0, 8)} [${environment}]`);
 
-    // 4. Enqueue scan job with full context
-    await scanQueue.add('trivy-scan', {
-      deployment_id: deployment.id,
-      service_id: service.id,
-      service_name,
-      repo_url,
-      image_name: `${service_name}:${commit_sha.slice(0, 7)}`,
-      commit_sha,
-      branch,
-      author,
-      environment,
-      pipeline_url,
-    });
+    // Later CI events may omit repo_url — fall back to the URL stored on the service
+    const scanRepoUrl = repo_url ?? service.repoUrl ?? undefined;
+    await scanQueue.add(
+      'trivy-scan',
+      {
+        deployment_id: deployment.id,
+        service_id: service.id,
+        service_name,
+        repo_url: scanRepoUrl,
+        image_name: `${service_name}:${commit_sha.slice(0, 7)}`,
+        commit_sha,
+        branch,
+        author,
+        environment,
+        pipeline_url,
+      },
+      { jobId: deployment.id } // BullMQ ignores a second job with the same id
+    );
     console.log(`📋 Scan enqueued for deployment ${deployment.id.slice(0, 8)}`);
 
     // 5. Notify frontend via WebSocket

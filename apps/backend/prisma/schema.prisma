@@ -34,7 +34,9 @@ model Deployment {
   commitMessage String?   @map("commit_message")
   branch        String?   @db.VarChar(100)
   author        String?   @db.VarChar(100)
-  status        String    @db.VarChar(20) // pending | running | success | failed
+  status        String    @db.VarChar(20) // pending | running | success | failed — combined from ciStatus + scanStatus
+  ciStatus      String?   @map("ci_status") @db.VarChar(20) // build status reported by CI webhooks (null for manual deploys)
+  scanStatus    String?   @map("scan_status") @db.VarChar(20) // security scan + policy outcome: running | success | failed
   environment   String?   @db.VarChar(20) // staging | production
   triggeredAt   DateTime  @default(now()) @map("triggered_at")
   completedAt   DateTime? @map("completed_at")
@@ -47,6 +49,7 @@ model Deployment {
   riskScores       RiskScore[]
   policyViolations PolicyViolation[]
 
+  @@index([serviceId, commitSha, environment])
   @@map("deployments")
 }
 
@@ -75,6 +78,7 @@ model Vulnerability {
   cveId           String?  @map("cve_id") @db.VarChar(50)
   title           String
   severity        String?  @db.VarChar(20) // critical | high | medium | low
+  severityRank    Int      @default(0) @map("severity_rank") // 4=critical … 1=low, 0=unknown — use for ordering
   cvssScore       Decimal? @map("cvss_score") @db.Decimal(3, 1)
   affectedPackage String?  @map("affected_package") @db.VarChar(200)
   fixedVersion    String?  @map("fixed_version") @db.VarChar(100)
@@ -87,6 +91,7 @@ model Vulnerability {
   deployment Deployment @relation(fields: [deploymentId], references: [id])
   service    Service    @relation(fields: [serviceId], references: [id])
 
+  @@index([deploymentId, severityRank])
   @@map("vulnerabilities")
 }
 
@@ -111,7 +116,7 @@ model PolicyViolation {
   id            String   @id @default(uuid())
   deploymentId  String   @map("deployment_id")
   serviceId     String   @map("service_id")
-  violationType String?  @map("violation_type") @db.VarChar(100) // secret_detected | unsigned_image | unscanned_dep
+  violationType String?  @map("violation_type") @db.VarChar(100) // critical_cve | secret_detected (created by the scan worker) | unsigned_image | unscanned_dep
   severity      String?  @db.VarChar(20)
   detail        String?
   detectedAt    DateTime @default(now()) @map("detected_at")

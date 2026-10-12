@@ -115,6 +115,7 @@ export async function triggerDeploy(req: Request, res: Response) {
       branch,
       author: 'devflow-ui',
       status: 'running',
+      scanStatus: 'queued', // manual deploys have no CI status — the scan decides the outcome
       environment,
       pipelineUrl: `https://github.com/${owner}/${repoName}/commit/${finalSha}`,
     });
@@ -131,7 +132,7 @@ export async function triggerDeploy(req: Request, res: Response) {
       author: 'devflow-ui',
       environment,
       pipeline_url: `https://github.com/${owner}/${repoName}/commit/${finalSha}`,
-    });
+    }, { jobId: deployment.id });
 
     try {
       wsEvents.deploymentCreated({ deploymentId: deployment.id, serviceName: service.name, status: 'running' });

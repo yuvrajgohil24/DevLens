@@ -1,4 +1,5 @@
 import prisma from '../db/prisma';
+import { severityRank } from '../utils/severity';
 
 export async function createScan(deploymentId: string, scannerType: string = 'trivy') {
   return prisma.scan.create({
@@ -60,7 +61,9 @@ export async function insertVulnerabilities(
   }>
 ) {
   if (vulnerabilities.length === 0) return;
-  return prisma.vulnerability.createMany({ data: vulnerabilities });
+  return prisma.vulnerability.createMany({
+    data: vulnerabilities.map((v) => ({ ...v, severityRank: severityRank(v.severity) })),
+  });
 }
 
 export async function insertSecrets(
@@ -81,3 +84,18 @@ export async function insertSecrets(
   return prisma.secret.createMany({ data: secrets });
 }
 
+
+/**
+ * Removes all scan output for a deployment so a retried scan job starts clean
+ * (otherwise retries leave duplicate risk scores and policy violations behind).
+ */
+export async function clearScanResults(deploymentId: string) {
+  const where = { deploymentId };
+  await prisma.$transaction([
+    prisma.vulnerability.deleteMany({ where }),
+    prisma.secret.deleteMany({ where }),
+    prisma.riskScore.deleteMany({ where }),
+    prisma.policyViolation.deleteMany({ where }),
+    prisma.scan.deleteMany({ where }),
+  ]);
+}

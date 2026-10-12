@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import { computeRiskScore } from '../src/utils/riskScore';
+import { severityRank } from '../src/utils/severity';
 
 const prisma = new PrismaClient();
 
@@ -47,13 +49,6 @@ function randomSha(): string {
 function randomTimeInPast(hoursAgo: number): Date {
   const jitter = (Math.random() - 0.5) * 2 * 3600 * 1000; // +/- 1 hour
   return new Date(Date.now() - hoursAgo * 3600 * 1000 + jitter);
-}
-
-function calcScore(c: number, h: number, m: number, l: number): number {
-  const total = c + h + m + l;
-  if (total === 0) return 0;
-  const w = c * 4 + h * 2 + m * 1 + l * 0.25;
-  return Math.min(10, Math.round((w / total) * 2.5 * 10) / 10);
 }
 
 // ~40% of sample vulns are resolved 2-96 hours after detection, so MTTR has data to show
@@ -139,6 +134,7 @@ async function main() {
             cveId: v.cveId,
             title: v.title,
             severity: v.severity as any,
+            severityRank: severityRank(v.severity),
             cvssScore: v.cvssScore,
             affectedPackage: v.affectedPackage,
             fixedVersion: v.fixedVersion,
@@ -157,7 +153,7 @@ async function main() {
         data: {
           serviceId: service.id,
           deploymentId: deployment.id,
-          score: calcScore(c, h, m, l),
+          score: computeRiskScore({ critical: c, high: h, medium: m, low: l }),
           criticalCount: c,
           highCount: h,
           mediumCount: m,

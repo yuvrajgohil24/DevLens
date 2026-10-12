@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../db/prisma';
+import { BY_SEVERITY } from '../utils/severity';
 
 export async function listVulnerabilities(req: Request, res: Response) {
   try {
@@ -17,7 +18,7 @@ export async function listVulnerabilities(req: Request, res: Response) {
         deployment: { select: { id: true, commitSha: true, branch: true, environment: true } },
         scan: { select: { isMock: true } },
       },
-      orderBy: [{ severity: 'asc' }, { cvssScore: 'desc' }, { detectedAt: 'desc' }],
+      orderBy: [BY_SEVERITY, { cvssScore: 'desc' }, { detectedAt: 'desc' }],
       take: limit ? parseInt(limit as string, 10) : 100,
       skip: offset ? parseInt(offset as string, 10) : 0,
     });

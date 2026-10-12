@@ -8,6 +8,7 @@ import app from './app';
 import { initializeWebSocket } from './websocket/index';
 import { redisConnection } from './db/redis';
 import prisma from './db/prisma';
+import { backfillSeverityRanks } from './db/backfill';
 
 // Import worker to register BullMQ processor
 import './jobs/scanWorker';
@@ -19,6 +20,7 @@ async function bootstrap() {
   try {
     await prisma.$connect();
     console.log('✅ PostgreSQL connected');
+    await backfillSeverityRanks();
   } catch (err) {
     console.error('❌ Failed to connect to PostgreSQL:', err);
     process.exit(1);

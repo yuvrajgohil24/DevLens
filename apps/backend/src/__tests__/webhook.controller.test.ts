@@ -5,13 +5,19 @@
 import { Request, Response } from 'express';
 import { handlePipelineWebhook } from '../webhooks/pipeline';
 import { getOrCreateService } from '../services/serviceService';
-import { createDeployment } from '../services/deploymentService';
+import { createDeployment, findDeploymentForCommit, applyDeploymentStatus } from '../services/deploymentService';
 import { scanQueue } from '../db/redis';
 import { wsEvents } from '../websocket/index';
 
 // Mock dependencies
 jest.mock('../services/serviceService');
-jest.mock('../services/deploymentService');
+jest.mock('../services/deploymentService', () => ({
+  ...jest.requireActual('../services/deploymentService'),
+  createDeployment: jest.fn(),
+  findDeploymentForCommit: jest.fn(),
+  applyDeploymentStatus: jest.fn(),
+}));
+jest.mock('../db/prisma', () => ({ __esModule: true, default: {} }));
 jest.mock('../db/redis', () => ({
   scanQueue: {
     add: jest.fn(),
@@ -20,6 +26,7 @@ jest.mock('../db/redis', () => ({
 jest.mock('../websocket/index', () => ({
   wsEvents: {
     deploymentCreated: jest.fn(),
+    deploymentUpdated: jest.fn(),
   },
 }));
 
@@ -44,6 +51,7 @@ describe('handlePipelineWebhook', () => {
 
     (getOrCreateService as jest.Mock).mockResolvedValue({ id: 'service-123', name: 'devlens-test' });
     (createDeployment as jest.Mock).mockResolvedValue({ id: 'deploy-456', status: 'running' });
+    (findDeploymentForCommit as jest.Mock).mockResolvedValue(null);
   });
 
   it('should return 400 for invalid payload', async () => {
@@ -82,14 +90,20 @@ describe('handlePipelineWebhook', () => {
       commitSha: 'abc1234def56789',
       branch: 'main',
       environment: 'production',
+      ciStatus: 'running',
+      scanStatus: 'queued',
     }));
 
     // 3. Enqueued Scan
-    expect(scanQueue.add).toHaveBeenCalledWith('trivy-scan', expect.objectContaining({
-      deployment_id: 'deploy-456',
-      service_id: 'service-123',
-      image_name: 'devlens-test:abc1234',
-    }));
+    expect(scanQueue.add).toHaveBeenCalledWith(
+      'trivy-scan',
+      expect.objectContaining({
+        deployment_id: 'deploy-456',
+        service_id: 'service-123',
+        image_name: 'devlens-test:abc1234',
+      }),
+      { jobId: 'deploy-456' }
+    );
 
     // 4. Emitted WebSocket Event
     expect(wsEvents.deploymentCreated).toHaveBeenCalledWith({
@@ -119,5 +133,42 @@ describe('handlePipelineWebhook', () => {
 
     expect(statusMock).toHaveBeenCalledWith(500);
     expect(jsonMock).toHaveBeenCalledWith({ error: 'Internal server error' });
+  });
+
+  it('should update the existing deployment (no duplicate, no re-scan) for repeat CI events', async () => {
+    (findDeploymentForCommit as jest.Mock).mockResolvedValue({ id: 'deploy-456', status: 'running' });
+    (applyDeploymentStatus as jest.Mock).mockResolvedValue({ id: 'deploy-456', status: 'success' });
+    req.body = {
+      commit_sha: 'abc1234def56789',
+      service_name: 'devlens-test',
+      status: 'success',
+      environment: 'production',
+    };
+
+    await handlePipelineWebhook(req as Request, res as Response);
+
+    expect(applyDeploymentStatus).toHaveBeenCalledWith('deploy-456', { ciStatus: 'success' }, expect.any(Object));
+    expect(createDeployment).not.toHaveBeenCalled();
+    expect(scanQueue.add).not.toHaveBeenCalled();
+    expect(wsEvents.deploymentUpdated).toHaveBeenCalledWith({ deploymentId: 'deploy-456', status: 'success' });
+    expect(statusMock).toHaveBeenCalledWith(200);
+    expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({ duplicate: true }));
+  });
+
+  it('should scan using the service repo URL when the event has no repo_url', async () => {
+    (getOrCreateService as jest.Mock).mockResolvedValue({
+      id: 'service-123',
+      name: 'devlens-test',
+      repoUrl: 'https://github.com/yuvrajgohil24/DevLens',
+    });
+    req.body = { commit_sha: 'abc1234def56789', service_name: 'devlens-test', status: 'success' };
+
+    await handlePipelineWebhook(req as Request, res as Response);
+
+    expect(scanQueue.add).toHaveBeenCalledWith(
+      'trivy-scan',
+      expect.objectContaining({ repo_url: 'https://github.com/yuvrajgohil24/DevLens' }),
+      { jobId: 'deploy-456' }
+    );
   });
 });

@@ -42,6 +42,12 @@ export default function DeploymentDetailPage({ params }: { params: Promise<{ id:
               <StatusBadge status={dep.status} />
             </div>
             <div style={{ color:'var(--text-secondary)', fontSize:'0.875rem' }}>{dep.commitMessage}</div>
+            {(dep.ciStatus || dep.scanStatus) && (
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:8, fontSize:'0.72rem', color:'var(--text-muted)' }}>
+                {dep.ciStatus && <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>Build <StatusBadge status={dep.ciStatus} /></span>}
+                {dep.scanStatus && <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>Security scan <StatusBadge status={dep.scanStatus} /></span>}
+              </div>
+            )}
           </div>
           {risk !== undefined && <RiskScoreBadge score={Number(risk)} size="lg" />}
         </div>

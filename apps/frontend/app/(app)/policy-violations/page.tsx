@@ -4,16 +4,18 @@ import { useEffect, useState } from 'react';
 import { api, PolicyViolation } from '@/lib/api';
 import { usePermissions } from '@/lib/permissions';
 import { useWebSocket } from '@/components/providers/WebSocketProvider';
-import { AlertTriangle, CheckCircle2, ShieldX, KeyRound, Package } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ShieldX, ShieldAlert, KeyRound, Package } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
+  critical_cve: ShieldAlert,
   secret_detected: KeyRound,
   unsigned_image: ShieldX,
   unscanned_dep: Package,
 };
 
 const TYPE_COLORS: Record<string, string> = {
+  critical_cve:    'var(--critical)',
   secret_detected: 'var(--critical)',
   unsigned_image:  'var(--high)',
   unscanned_dep:   'var(--medium)',

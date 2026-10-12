@@ -40,15 +40,14 @@ describe('Risk Score Service', () => {
     expect(result.highCount).toBe(0);
   });
 
-  it('should treat secrets as critical (weight 4) and calculate a high score', async () => {
+  it('should treat secrets as critical and calculate a high score', async () => {
     (prisma.vulnerability.groupBy as jest.Mock).mockResolvedValue([]);
-    // 2 secrets, 0 CVEs -> 2 criticals. Score should be maxed or very high.
-    // Formula: score = Math.min(10, ( (2 * 4) / 2 ) * 2.5 ) = min(10, 4 * 2.5) = 10
+    // 2 secrets -> W = 2*10 = 20 -> 10 * (1 - e^-2) = 8.65 -> 8.6
     (prisma.secret.count as jest.Mock).mockResolvedValue(2);
 
     const result = await calculateRiskScore(deploymentId, serviceId);
 
-    expect(result.score).toBe(10);
+    expect(result.score).toBe(8.6);
     expect(result.criticalCount).toBe(2); 
   });
 
@@ -61,12 +60,10 @@ describe('Risk Score Service', () => {
     ]);
     (prisma.secret.count as jest.Mock).mockResolvedValue(0);
 
-    // Total = 4
-    // Weighted = (1*4) + (2*2) + (1*1) + (0) = 4 + 4 + 1 = 9
-    // Score = min(10, (9/4) * 2.5) = min(10, 2.25 * 2.5) = min(10, 5.625) -> rounded to 5.6
+    // W = 1*10 + 2*4 + 1*1 = 19 -> 10 * (1 - e^-1.9) = 8.50 -> 8.5
     const result = await calculateRiskScore(deploymentId, serviceId);
 
-    expect(result.score).toBe(5.6);
+    expect(result.score).toBe(8.5);
     expect(result.criticalCount).toBe(1);
     expect(result.highCount).toBe(2);
     expect(result.mediumCount).toBe(1);

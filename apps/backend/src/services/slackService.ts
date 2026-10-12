@@ -9,6 +9,10 @@ interface SlackAlertData {
   pipelineUrl?: string;
   commitSha: string;
   branch: string;
+  /** Why the deployment was blocked / extra context, shown as the message body */
+  reason?: string;
+  /** Extra fields appended to the alert */
+  details?: Record<string, string>;
 }
 
 interface GenericSlackAlert {
@@ -38,8 +42,9 @@ export async function sendSlackAlert(data: SlackAlertData | GenericSlackAlert) {
       attachments: [
         {
           color: color,
-          title: `${emoji} Deployment ${data.status.toUpperCase()}: ${data.serviceName}`,
+          title: `${emoji} Security scan ${isFailed ? 'BLOCKED' : 'PASSED'}: ${data.serviceName}`,
           title_link: data.pipelineUrl,
+          ...(data.reason && { text: data.reason }),
           fields: [
             { title: 'Service', value: data.serviceName, short: true },
             { title: 'Environment', value: data.environment, short: true },
@@ -47,6 +52,7 @@ export async function sendSlackAlert(data: SlackAlertData | GenericSlackAlert) {
             { title: 'Risk Score', value: `*${data.riskScore}*`, short: true },
             { title: 'Critical Issues', value: `*${data.criticalCount}*`, short: true },
             { title: 'Commit', value: `\`${data.commitSha.slice(0, 7)}\``, short: true },
+            ...Object.entries(data.details ?? {}).map(([k, v]) => ({ title: k, value: v, short: true })),
           ],
           footer: 'DevLens Security Platform',
           ts: Math.floor(Date.now() / 1000),

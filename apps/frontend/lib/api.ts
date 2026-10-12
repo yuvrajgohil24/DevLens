@@ -154,6 +154,8 @@ export interface Deployment {
   branch: string | null;
   author: string | null;
   status: 'pending' | 'running' | 'success' | 'failed';
+  ciStatus?: string | null;   // build status from CI webhooks (null for manual deploys)
+  scanStatus?: string | null; // security scan / policy outcome
   environment: string | null;
   triggeredAt: string;
   completedAt: string | null;
