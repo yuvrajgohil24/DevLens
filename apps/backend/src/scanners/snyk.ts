@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { NormalizedVulnerability } from './trivy';
 import { mockScannersAllowed, ScannerResult, SCANNER_TIMEOUT_MS } from './mock';
+import { logger } from '../utils/logger';
 
 const execAsync = promisify(exec);
 
@@ -10,11 +11,11 @@ export async function runSnyk(targetPath: string): Promise<ScannerResult> {
 
   if (!snykToken) {
     if (mockScannersAllowed()) {
-      console.warn('⚠️ [SNYK] SNYK_TOKEN not set — using MOCK data (results are labelled as mock)');
+      logger.warn({ scanner: 'snyk' }, 'SNYK_TOKEN not set — using MOCK data (labelled as mock)');
       return { output: await getMockSnykData(), isMock: true };
     }
     // Snyk is optional: without a token it simply doesn't run
-    console.warn('⚠️ [SNYK] SNYK_TOKEN not set — skipping Snyk scan');
+    logger.warn({ scanner: 'snyk' }, 'SNYK_TOKEN not set — skipping Snyk scan');
     return { output: null, isMock: false, skipped: true };
   }
 
@@ -22,7 +23,7 @@ export async function runSnyk(targetPath: string): Promise<ScannerResult> {
   const command = `npx snyk test --json --all-projects "${targetPath}"`;
 
   try {
-    console.log(`🔍 [SNYK] Running real SCA scan on: ${targetPath}`);
+    logger.info({ scanner: 'snyk', targetPath }, 'Running Snyk scan');
     // Passing the SNYK_TOKEN via environment variables
     const { stdout } = await execAsync(command, {
       maxBuffer: 1024 * 1024 * 10,
@@ -30,7 +31,7 @@ export async function runSnyk(targetPath: string): Promise<ScannerResult> {
       env: { ...process.env, SNYK_TOKEN: snykToken }
     });
 
-    console.log(`✅ [SNYK] Real scan complete (No vulnerabilities found)`);
+    logger.info({ scanner: 'snyk' }, 'Snyk scan complete (no vulnerabilities)');
     return { output: JSON.parse(stdout), isMock: false };
   } catch (err: any) {
     // Snyk CLI exits with code 1 if vulnerabilities are found, and code 2 for errors.
@@ -38,18 +39,18 @@ export async function runSnyk(targetPath: string): Promise<ScannerResult> {
     if (err.stdout) {
       try {
         const parsed = JSON.parse(err.stdout);
-        console.log(`✅ [SNYK] Real scan complete (Vulnerabilities found)`);
+        logger.info({ scanner: 'snyk' }, 'Snyk scan complete (vulnerabilities found)');
         return { output: parsed, isMock: false };
       } catch (parseErr) {
-        console.error('⚠️ [SNYK] Failed to parse Snyk JSON output from error:', parseErr);
+        logger.error({ scanner: 'snyk', err: parseErr }, 'Failed to parse Snyk JSON output');
       }
     }
 
-    console.error(`❌ [SNYK] Real scan execution failed:`, err.message);
+    logger.error({ scanner: 'snyk', err }, 'Snyk scan failed');
     if (!mockScannersAllowed()) {
       throw new Error(`Snyk scan failed and mock data is disabled (MOCK_SCANNERS): ${String(err.message).slice(0, 500)}`);
     }
-    console.warn('⚠️ [SNYK] Falling back to MOCK data due to execution error.');
+    logger.warn({ scanner: 'snyk' }, 'Falling back to MOCK data after Snyk failure');
     return { output: await getMockSnykData(), isMock: true };
   }
 }
@@ -120,7 +121,7 @@ export function parseSnykOutput(rawOutput: unknown): NormalizedVulnerability[] {
     
     return results;
   } catch (err) {
-    console.error('Failed to parse Snyk output:', err);
+    logger.error({ scanner: 'snyk', err }, 'Failed to parse Snyk output');
     return [];
   }
 }

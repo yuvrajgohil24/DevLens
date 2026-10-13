@@ -1,11 +1,16 @@
 import { Request, Response } from 'express';
 import prisma from '../db/prisma';
+import { sendError } from '../utils/httpErrors';
+import { z } from 'zod';
+import { idParam, parseQuery } from '../utils/query';
+
+const RiskTrendsQuery = z.object({ serviceId: idParam.optional() });
 
 export async function getRiskTrends(req: Request, res: Response) {
+  const query = parseQuery(RiskTrendsQuery, req, res);
+  if (!query) return;
   try {
-    const { serviceId } = req.query;
-    
-    const whereClause = serviceId ? { serviceId: String(serviceId) } : {};
+    const whereClause = query.serviceId ? { serviceId: query.serviceId } : {};
     
     // Fetch last 30 risk scores across the system or specific service
     const riskScores = await prisma.riskScore.findMany({
@@ -28,8 +33,7 @@ export async function getRiskTrends(req: Request, res: Response) {
 
     return res.json({ data });
   } catch (err) {
-    console.error('Failed to get risk trends:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, err, 'Failed to get risk trends');
   }
 }
 
@@ -81,7 +85,6 @@ export async function getMttr(_req: Request, res: Response) {
 
     return res.json(computeMttr(resolved, now));
   } catch (err) {
-    console.error('Failed to get MTTR:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, err, 'Failed to get MTTR');
   }
 }

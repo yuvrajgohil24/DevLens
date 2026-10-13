@@ -1,5 +1,6 @@
 import IORedis, { RedisOptions } from 'ioredis';
 import { Queue } from 'bullmq';
+import { logger } from '../utils/logger';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const isTls = REDIS_URL.startsWith('rediss://');
@@ -29,7 +30,7 @@ export const scanQueue = new Queue('scan-queue', {
   },
 });
 
-redisConnection.on('connect', () => console.log('✅ Redis connected'));
-redisConnection.on('error', (err) => console.error('❌ Redis error:', err.message));
+redisConnection.on('connect', () => logger.info('Redis connected'));
+redisConnection.on('error', (err) => logger.error({ err }, 'Redis error'));
 
 export default redisConnection;

@@ -9,6 +9,7 @@ import { initializeWebSocket } from './websocket/index';
 import { redisConnection } from './db/redis';
 import prisma from './db/prisma';
 import { backfillSeverityRanks } from './db/backfill';
+import { logger } from './utils/logger';
 
 // By default the scan worker runs inside the API process (simple single-service
 // deploy). Set RUN_SCAN_WORKER=false here and run `npm run start:worker` as a
@@ -22,11 +23,11 @@ async function bootstrap() {
   // 1. Test DB connection
   try {
     await prisma.$connect();
-    console.log('✅ PostgreSQL connected');
+    logger.info('PostgreSQL connected');
     // Best effort: sorting falls back gracefully if this fails, so don't block boot
-    await backfillSeverityRanks().catch((err) => console.warn('⚠️ Severity rank backfill skipped:', err.message));
+    await backfillSeverityRanks().catch((err) => logger.warn({ err }, 'Severity rank backfill skipped'));
   } catch (err) {
-    console.error('❌ Failed to connect to PostgreSQL:', err);
+    logger.fatal({ err }, 'Failed to connect to PostgreSQL');
     process.exit(1);
   }
 
@@ -34,7 +35,7 @@ async function bootstrap() {
   try {
     await redisConnection.connect();
   } catch (err) {
-    console.error('❌ Failed to connect to Redis:', err);
+    logger.fatal({ err }, 'Failed to connect to Redis');
     process.exit(1);
   }
 
@@ -46,20 +47,20 @@ async function bootstrap() {
 
   // 5. Start listening
   httpServer.listen(PORT, async () => {
-    console.log(`\n🚀 DevLens Backend running at http://localhost:${PORT}`);
-    console.log(`📡 WebSocket available at ws://localhost:${PORT}`);
-    console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-    console.log(`🪝 Webhook listener active on /api/webhooks/pipeline\n`);
+    logger.info(
+      { port: PORT, scanWorker: RUN_SCAN_WORKER ? 'in-process' : 'external' },
+      `DevLens backend listening on :${PORT} (health: /health, webhook: /api/webhooks/pipeline)`
+    );
   });
 
   // 6. Graceful shutdown
   const shutdown = async (signal: string) => {
-    console.log(`\n${signal} received — shutting down gracefully...`);
+    logger.info({ signal }, 'Shutting down gracefully');
     httpServer.close(async () => {
       if (scanWorker) await scanWorker.close();
       await prisma.$disconnect();
       await redisConnection.quit();
-      console.log('✅ Shutdown complete');
+      logger.info('Shutdown complete');
       process.exit(0);
     });
   };
@@ -69,6 +70,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((err) => {
-  console.error('Bootstrap failed:', err);
+  logger.fatal({ err }, 'Bootstrap failed');
   process.exit(1);
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, PolicyViolation } from '@/lib/api';
 import { usePermissions } from '@/lib/permissions';
 import { useWebSocket } from '@/components/providers/WebSocketProvider';
@@ -29,15 +29,18 @@ export default function PolicyViolationsPage() {
   const { canWrite } = usePermissions();
   const readOnly = !canWrite;
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await api.policyViolations.list({ resolved: showResolved ? undefined : 'false' });
-    setViolations(data);
-    setLoading(false);
-  };
+    try {
+      const { data } = await api.policyViolations.list({ resolved: showResolved ? undefined : 'false' });
+      setViolations(data);
+    } finally {
+      setLoading(false);
+    }
+  }, [showResolved]);
 
-  useEffect(() => { load(); }, [showResolved]);
-  useEffect(() => { if (lastScan) load(); }, [lastScan]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (lastScan) load(); }, [lastScan, load]);
 
   const handleResolve = async (id: string) => {
     if (readOnly) return; // viewers (incl. demo) are read-only

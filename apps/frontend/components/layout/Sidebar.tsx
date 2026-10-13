@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Rocket, ShieldAlert, Server,
@@ -26,15 +27,13 @@ export function Sidebar() {
       {/* Logo */}
       <div style={{ padding: '20px 20px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img 
-            src="/DevLens logo.png" 
-            alt="DevLens Logo" 
-            style={{ 
-              height: 32, 
-              width: 'auto', 
-              objectFit: 'contain',
-              maxWidth: '100%'
-            }} 
+          <Image
+            src="/DevLens logo.png"
+            alt="DevLens Logo"
+            width={32}
+            height={32}
+            priority
+            style={{ objectFit: 'contain', maxWidth: '100%' }}
           />
         </div>
       </div>

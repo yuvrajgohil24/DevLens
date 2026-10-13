@@ -1,5 +1,6 @@
 import prisma from '../db/prisma';
 import { computeRiskScore } from '../utils/riskScore';
+import { logger } from '../utils/logger';
 
 /**
  * Calculates and stores the risk score for a deployment's open, real (non-mock) findings.
@@ -37,9 +38,9 @@ export async function calculateRiskScore(deploymentId: string, serviceId: string
     data: { serviceId, deploymentId, score, criticalCount: criticalCount + secretCount, highCount, mediumCount, lowCount },
   });
 
-  console.log(
-    `📊 Risk score [deployment: ${deploymentId.slice(0, 8)}]: ${score} ` +
-      `(C:${criticalCount} S:${secretCount} H:${highCount} M:${mediumCount} L:${lowCount})`
+  logger.info(
+    { deploymentId, score, critical: criticalCount, secrets: secretCount, high: highCount, medium: mediumCount, low: lowCount },
+    'Risk score calculated'
   );
 
   return riskScore;

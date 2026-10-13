@@ -13,7 +13,7 @@ datasource db {
 
 model Service {
   id        String   @id @default(uuid())
-  name      String   @db.VarChar(100)
+  name      String   @unique @db.VarChar(100)
   repoUrl   String?  @map("repo_url")
   language  String?  @db.VarChar(50)
   createdAt DateTime @default(now()) @map("created_at")
@@ -109,6 +109,7 @@ model RiskScore {
   service    Service    @relation(fields: [serviceId], references: [id])
   deployment Deployment @relation(fields: [deploymentId], references: [id])
 
+  @@index([serviceId, calculatedAt])
   @@map("risk_scores")
 }
 

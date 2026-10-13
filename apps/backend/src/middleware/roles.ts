@@ -1,6 +1,7 @@
 import { clerkClient } from '@clerk/express';
 import { Request, Response, NextFunction } from 'express';
 import { getUserId } from './auth';
+import { logger } from '../utils/logger';
 
 /**
  * Role-based access control.
@@ -38,7 +39,7 @@ export async function getUserRole(userId: string): Promise<Role> {
     role = (user.publicMetadata as { role?: string } | undefined)?.role === 'admin' ? 'admin' : 'viewer';
   } catch (err) {
     // Fail closed: if Clerk can't be reached, treat the user as a viewer (and don't cache it)
-    console.error('❌ Failed to resolve user role from Clerk:', (err as Error).message);
+    logger.error({ err, userId }, 'Failed to resolve user role from Clerk — treating as viewer');
     return 'viewer';
   }
 

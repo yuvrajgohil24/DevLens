@@ -1,4 +1,6 @@
 import axios, { AxiosError } from 'axios';
+import { PublicError } from '../utils/httpErrors';
+import { logger } from '../utils/logger';
 
 // ── GitHub API client ──────────────────────────────────────────────────────
 const github = axios.create({
@@ -46,37 +48,24 @@ export interface GitHubRepo {
 // ── Helper ─────────────────────────────────────────────────────────────────
 function handleGitHubError(err: unknown, context: string): never {
   const axErr = err as AxiosError;
-  if (axErr.response?.status === 401) {
-    throw new Error(`GitHub: Unauthorized — check GITHUB_TOKEN (${context})`);
+  const status = axErr.response?.status;
+  logger.error({ context, status, err: axErr.message }, 'GitHub API error');
+
+  if (status === 401) {
+    throw new PublicError(502, 'GitHub integration is misconfigured (invalid token)');
   }
-  if (axErr.response?.status === 403) {
-    const rateReset = axErr.response.headers['x-ratelimit-reset'];
-    const resetTime = rateReset ? new Date(Number(rateReset) * 1000).toISOString() : 'unknown';
-    throw new Error(`GitHub: Rate limit hit — resets at ${resetTime} (${context})`);
+  if (status === 403 || status === 429) {
+    const rateReset = axErr.response?.headers['x-ratelimit-reset'];
+    const when = rateReset ? ` after ${new Date(Number(rateReset) * 1000).toISOString()}` : ' later';
+    throw new PublicError(503, `GitHub rate limit reached — try again${when}`);
   }
-  if (axErr.response?.status === 404) {
-    throw new Error(`GitHub: Repository not found (${context})`);
+  if (status === 404) {
+    throw new PublicError(404, 'Repository not found on GitHub');
   }
-  throw new Error(`GitHub API error in ${context}: ${axErr.message}`);
+  throw new PublicError(502, 'GitHub API request failed');
 }
 
 // ── Service functions ──────────────────────────────────────────────────────
-
-/**
- * Resolves a repo name from a DevLens service name.
- * Falls back to GITHUB_REPO env variable if no match found.
- * Future: could query DB to look up `repoUrl` on the Service record.
- */
-export function resolveRepo(serviceName: string): string {
-  const envRepo = process.env.GITHUB_REPO;
-  // If service name looks like a real repo (contains known-repo name), use it directly.
-  // Otherwise fallback to the configured default repo.
-  if (envRepo && serviceName.toLowerCase() === envRepo.toLowerCase()) {
-    return envRepo;
-  }
-  // Default: use the configured repo; allows DevFlow to work with a single repo
-  return envRepo || serviceName;
-}
 
 /**
  * Fetches all branches for a repository.

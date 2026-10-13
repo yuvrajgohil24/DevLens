@@ -52,7 +52,6 @@ FRONTEND_URL=https://your-vercel-app.vercel.app
 
 GITHUB_TOKEN=your_github_pat_token
 GITHUB_OWNER=yuvrajgohil24
-GITHUB_REPO=DevLens
 
 SLACK_WEBHOOK_URL=your_slack_webhook_url
 SNYK_TOKEN=your_snyk_token
@@ -68,6 +67,10 @@ WEBHOOK_SECRET=output_of_openssl_rand_hex_32
 ADMIN_USER_IDS=user_your_own_clerk_id
 
 # Do NOT set in production: LOCAL_GIT_ACTIONS (server-side git push/pull) or MOCK_SCANNERS=true
+
+# Secret scanning: DevLens' own history (commits a72814e, 441b4ff) contains dummy
+# test secrets. Start TruffleHog after them so DevLens deploys aren't blocked by them:
+TRUFFLEHOG_SINCE_COMMIT=bc254379203594b3f044f83d25d7d1692b135d05
 
 # Optional tuning
 # RUN_SCAN_WORKER=false        # only when a separate worker service runs (Step 4b)

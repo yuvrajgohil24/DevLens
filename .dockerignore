@@ -11,8 +11,6 @@
 **/*.log
 coverage
 assets
-scratch
-test-repo
 apps/backend/bin
 
 # The backend image only needs the frontend's package.json (referenced by the lockfile)

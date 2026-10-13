@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../db/prisma';
+import { latestRiskScoreByService } from '../services/riskScoreQueries';
+import { sendError } from '../utils/httpErrors';
 
 export async function getOverview(_req: Request, res: Response) {
   try {
@@ -20,11 +22,7 @@ export async function getOverview(_req: Request, res: Response) {
       prisma.vulnerability.count({ where: { severity: 'critical', isResolved: false } }),
       prisma.policyViolation.count({ where: { isResolved: false } }),
       prisma.service.count(),
-      prisma.riskScore.findMany({
-        distinct: ['serviceId'],
-        orderBy: { calculatedAt: 'desc' },
-        select: { score: true },
-      }),
+      latestRiskScoreByService(),
       prisma.deployment.findMany({
         take: 5,
         orderBy: { triggeredAt: 'desc' },
@@ -37,10 +35,8 @@ export async function getOverview(_req: Request, res: Response) {
       prisma.secret.count(),
     ]);
 
-    const avgRiskScore =
-      latestRiskScores.length > 0
-        ? latestRiskScores.reduce((sum, r) => sum + Number(r.score), 0) / latestRiskScores.length
-        : 0;
+    const scores = [...latestRiskScores.values()];
+    const avgRiskScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
 
     return res.json({
       totalDeployments,
@@ -54,7 +50,6 @@ export async function getOverview(_req: Request, res: Response) {
       recentDeployments,
     });
   } catch (err) {
-    console.error('Dashboard overview error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, err, 'Dashboard overview error');
   }
 }

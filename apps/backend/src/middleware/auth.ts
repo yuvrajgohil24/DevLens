@@ -1,5 +1,6 @@
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { Request, Response, NextFunction } from 'express';
+import { reqLogger } from '../utils/logger';
 
 /**
  * Verifies the Clerk session token (Bearer header) and attaches the auth state
@@ -23,7 +24,7 @@ export function getUserId(req: Request): string | undefined {
 export const protectRoute = (req: Request, res: Response, next: NextFunction) => {
   clerkAuth(req, res, (err?: unknown) => {
     if (err) {
-      console.error('❌ Auth error:', (err as Error).message);
+      reqLogger(req).warn({ err }, 'Clerk authentication error');
       return res.status(401).json({ error: 'Unauthorized', message: 'Invalid session' });
     }
     if (!getUserId(req)) {

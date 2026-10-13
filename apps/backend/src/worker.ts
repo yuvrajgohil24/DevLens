@@ -8,13 +8,14 @@ import path from 'path';
 dotenv.config({ path: path.join(__dirname, '../.env') });
 import prisma from './db/prisma';
 import scanWorker from './jobs/scanWorker';
+import { logger } from './utils/logger';
 
 async function bootstrap() {
   await prisma.$connect();
-  console.log('✅ PostgreSQL connected (worker)');
+  logger.info('PostgreSQL connected (worker)');
 
   const shutdown = async (signal: string) => {
-    console.log(`\n${signal} received — finishing active scans and shutting down...`);
+    logger.info({ signal }, 'Finishing active scans and shutting down');
     await scanWorker.close(); // waits for in-flight jobs
     await prisma.$disconnect();
     process.exit(0);
@@ -24,6 +25,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((err) => {
-  console.error('❌ Worker bootstrap failed:', err);
+  logger.fatal({ err }, 'Worker bootstrap failed');
   process.exit(1);
 });

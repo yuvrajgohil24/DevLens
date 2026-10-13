@@ -93,7 +93,7 @@ export default function DevFlowPage() {
 
   useEffect(() => {
     if (selectedRepo) loadBranches(selectedRepo);
-  }, [selectedRepo]);
+  }, [selectedRepo, loadBranches]);
 
   // ── Auto-load commits when branch changes ───────────────────
   const loadCommits = useCallback(async (branch?: string) => {

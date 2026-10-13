@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useAuth } from '@clerk/nextjs';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000';
 
@@ -49,11 +50,22 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const [lastScan, setLastScan] = useState<ScanCompletedEvent | null>(null);
   const [criticalAlert, setCriticalAlert] = useState<CriticalCveEvent | null>(null);
 
+  const { isSignedIn, getToken } = useAuth();
+
   useEffect(() => {
+    // The server only accepts authenticated sockets
+    if (!isSignedIn) return;
+
     const socket = io(WS_URL, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
+      // Called on every (re)connect, so an expired session token is refreshed
+      auth: (cb) => {
+        getToken()
+          .then((token) => cb({ token }))
+          .catch(() => cb({ token: null }));
+      },
     });
 
     socketRef.current = socket;
@@ -83,10 +95,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       setCriticalAlert(data);
     });
 
+    socket.on('connect_error', (err) => {
+      console.warn('⚠️ WebSocket connection rejected:', err.message);
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [isSignedIn, getToken]);
 
   return (
     <WebSocketContext.Provider

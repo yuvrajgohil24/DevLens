@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
+import { reqLogger } from '../utils/logger';
 
 export const SIGNATURE_HEADER = 'x-devlens-signature-256';
 
@@ -19,10 +20,10 @@ export function verifyWebhookSignature(req: Request, res: Response, next: NextFu
 
   if (!secret) {
     if (process.env.ALLOW_UNSIGNED_WEBHOOKS === 'true') {
-      console.warn('⚠️ WEBHOOK_SECRET is not set — accepting UNSIGNED webhook (ALLOW_UNSIGNED_WEBHOOKS=true)');
+      reqLogger(req).warn('WEBHOOK_SECRET not set — accepting UNSIGNED webhook (ALLOW_UNSIGNED_WEBHOOKS=true)');
       return next();
     }
-    console.error('❌ WEBHOOK_SECRET is not set — rejecting webhook');
+    reqLogger(req).error('WEBHOOK_SECRET not set — rejecting webhook');
     return res.status(503).json({ error: 'Webhook not configured' });
   }
 

@@ -112,6 +112,7 @@ const CVE_POOL: NormalizedVulnerability[] = [
 ];
 
 import { mockScannersAllowed, ScannerResult, SCANNER_TIMEOUT_MS } from './mock';
+import { logger } from '../utils/logger';
 
 export async function runTrivy(targetPath: string): Promise<ScannerResult> {
   // Try to find trivy in common locations
@@ -125,9 +126,9 @@ export async function runTrivy(targetPath: string): Promise<ScannerResult> {
   for (const trivyBin of trivyPaths) {
     const command = `"${trivyBin}" fs --format json "${targetPath}"`;
     try {
-      console.log(`🔍 [TRIVY] Trying: ${trivyBin}`);
+      logger.debug({ scanner: 'trivy', bin: trivyBin }, 'Trying Trivy binary');
       const { stdout } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10, timeout: SCANNER_TIMEOUT_MS });
-      console.log(`✅ [TRIVY] Real scan complete`);
+      logger.info({ scanner: 'trivy', bin: trivyBin }, 'Trivy scan complete');
       return { output: JSON.parse(stdout), isMock: false };
     } catch (err: any) {
       lastError = String(err?.stderr || err?.message || err).slice(0, 500);
@@ -140,7 +141,7 @@ export async function runTrivy(targetPath: string): Promise<ScannerResult> {
   }
 
   // Fallback: trivy not available — return the sample CVE pool, flagged as mock
-  console.warn('⚠️ [TRIVY] Binary not found — using MOCK CVE data (results are labelled as mock)');
+  logger.warn({ scanner: 'trivy', lastError }, 'Trivy unavailable — using MOCK CVE data (labelled as mock)');
   return {
     isMock: true,
     output: {
@@ -193,7 +194,7 @@ export function parseTrivyOutput(rawOutput: unknown): NormalizedVulnerability[] 
 
     return results;
   } catch (err) {
-    console.error('Failed to parse Trivy output:', err);
+    logger.error({ scanner: 'trivy', err }, 'Failed to parse Trivy output');
     return [];
   }
 }

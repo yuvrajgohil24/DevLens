@@ -6,7 +6,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
+import pinoHttp from 'pino-http';
+import { randomUUID } from 'crypto';
 
 import { handlePipelineWebhook } from './webhooks/pipeline';
 import { getOverview } from './api/dashboard';
@@ -25,8 +26,16 @@ import {
 } from './api/devflow';
 import { getRiskTrends, getMttr } from './api/analytics';
 import { createDemoSession } from './api/demo';
+import { toErrorResponse } from './utils/httpErrors';
+import { logger, reqLogger } from './utils/logger';
+import { getUserId } from './middleware/auth';
 
 const app = express();
+
+// Number of reverse proxies in front of the app (Railway: 1), so req.ip is the
+// real client IP for rate limiting. Default 0 locally: never trust a client-sent
+// X-Forwarded-For when nothing sits in front of the server.
+app.set('trust proxy', Number(process.env.TRUST_PROXY ?? (process.env.NODE_ENV === 'production' ? 1 : 0)));
 
 // ── Middleware ─────────────────────────────────────────────
 app.use(helmet());
@@ -37,7 +46,28 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
-app.use(morgan('dev'));
+// Request logging with a request id per request: taken from an incoming
+// X-Request-Id (if sane) or generated, echoed back in the response header and
+// attached to every log line written for that request (req.log).
+app.use(
+  pinoHttp({
+    logger,
+    genReqId: (req, res) => {
+      const incoming = req.headers['x-request-id'];
+      const id = typeof incoming === 'string' && /^[\w-]{1,64}$/.test(incoming) ? incoming : randomUUID();
+      res.setHeader('X-Request-Id', id);
+      return id;
+    },
+    autoLogging: { ignore: (req) => req.url === '/health' },
+    customLogLevel: (_req, res, err) => (err || res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info'),
+    // Keep request logs small: method, url, status, duration, user
+    serializers: {
+      req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+      res: (res) => ({ statusCode: res.statusCode }),
+    },
+    customProps: (req) => ({ userId: getUserId(req as express.Request) }),
+  })
+);
 app.use(
   express.json({
     // Keep the exact request bytes so webhook HMAC signatures can be verified
@@ -58,10 +88,17 @@ import { protectRoute } from './middleware/auth';
 import { blockDemoWrites } from './middleware/demoGuard';
 import { verifyWebhookSignature } from './middleware/webhookSignature';
 import { requireAdminForWrites, getCurrentUser } from './middleware/roles';
+import { apiLimiter, webhookLimiter, demoSessionLimiter } from './middleware/rateLimit';
 
 // Public /api/ routes that must NOT require a Clerk session.
 const isPublicApi = (path: string) =>
   path.startsWith('/api/webhooks/') || path.startsWith('/api/demo/');
+
+// Rate limits run before auth, so unauthenticated floods are cut off cheaply.
+// Public routes get their own (stricter) limiters below.
+app.use((req, res, next) =>
+  req.path.startsWith('/api/') && !isPublicApi(req.path) ? apiLimiter(req, res, next) : next()
+);
 
 app.use((req, res, next) => {
   // Protect all /api/ routes except the public ones above
@@ -88,10 +125,10 @@ app.use((req, res, next) => {
 });
 
 // ── Webhooks ───────────────────────────────────────────────
-app.post('/api/webhooks/pipeline', verifyWebhookSignature, handlePipelineWebhook);
+app.post('/api/webhooks/pipeline', webhookLimiter, verifyWebhookSignature, handlePipelineWebhook);
 
 // ── Demo / Guest session (public) ──────────────────────────
-app.post('/api/demo/session', createDemoSession);
+app.post('/api/demo/session', demoSessionLimiter, createDemoSession);
 
 // ── Current user / permissions ─────────────────────────────
 app.get('/api/me', getCurrentUser);
@@ -135,9 +172,12 @@ app.use((_req, res) => {
 });
 
 // ── Error handler ──────────────────────────────────────────
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Internal server error', message: err.message });
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const { status, body } = toErrorResponse(err);
+  // Log server errors in full; client errors (bad JSON etc.) only briefly
+  if (status >= 500) reqLogger(req).error({ err }, 'Unhandled error');
+  else reqLogger(req).warn({ status, reason: err.message }, 'Client error');
+  res.status(status).json(status >= 500 ? { ...body, requestId: req.id } : body);
 });
 
 export default app;

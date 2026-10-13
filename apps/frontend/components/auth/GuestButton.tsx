@@ -24,7 +24,6 @@ export function GuestButton() {
   // Poll until window.Clerk is available and loaded
   useEffect(() => {
     const check = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((window as any).Clerk?.loaded) {
         setReady(true);
       }
@@ -35,7 +34,6 @@ export function GuestButton() {
   }, []);
 
   async function handleGuest() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const clerk = (window as any).Clerk;
     if (!clerk) {
       setError('Clerk not initialized yet. Please wait and try again.');
@@ -70,7 +68,6 @@ export function GuestButton() {
       setError(`Sign-in did not complete (status: ${signIn.status ?? 'unknown'}).`);
     } catch (err: unknown) {
       console.error('Guest sign-in error:', err);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const msg = (err as any)?.errors?.[0]?.longMessage || (err as any)?.errors?.[0]?.message;
       setError(msg || 'Demo login failed — is the backend running? (see console)');
     } finally {

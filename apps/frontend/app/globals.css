@@ -38,9 +38,9 @@
   --radius: 4px; /* Even sharper corners */
 
   /* Font Aliases */
-  --font-sans: 'Inter', sans-serif;
-  --font-heading: 'Plus Jakarta Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: var(--font-inter), sans-serif;
+  --font-heading: var(--font-jakarta), sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
 
   /* shadcn tokens */
   --foreground: 255 255 255;

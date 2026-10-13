@@ -12,6 +12,7 @@ import { cloneRepository, cleanupDirectory } from '../utils/git';
 import { sendSlackAlert } from '../services/slackService';
 import path from 'path';
 import os from 'os';
+import { logger } from '../utils/logger';
 interface ScanJobData {
   deployment_id: string;
   service_id: string;
@@ -31,7 +32,9 @@ const worker = new Worker<ScanJobData>(
   'scan-queue',
   async (job: Job<ScanJobData>) => {
     const { deployment_id, service_id, service_name, image_name, repo_url, environment } = job.data;
-    console.log(`\n🔬 Starting scan job [${job.id}] for ${image_name}`);
+    // Every log line of this job carries its ids, so one scan can be followed end to end
+    const log = logger.child({ jobId: job.id, deploymentId: deployment_id, service: service_name, attempt: job.attemptsMade + 1 });
+    log.info({ image: image_name }, 'Scan job started');
 
     // 0. Idempotency: if this job is a retry, remove everything a previous attempt
     //    may have written for this deployment (atomically, children before scans)
@@ -60,7 +63,7 @@ const worker = new Worker<ScanJobData>(
 
       try {
         // 4. RUN ALL SCANNERS
-        console.log(`📡 [WORKER] Orchestrating Scans for ${service_name}...`);
+        log.info('Running scanners');
         
         // --- TRIVY (CVEs) ---
         const trivy = await runTrivy(scanTargetPath);
@@ -90,7 +93,7 @@ const worker = new Worker<ScanJobData>(
         ];
         const usedMockData = trivy.isMock || snyk.isMock;
         if (usedMockData) {
-          console.warn(`⚠️ [POLICY] Mock scanner data was used — it is excluded from the policy decision and risk score`);
+          log.warn({ trivyMock: trivy.isMock, snykMock: snyk.isMock }, 'Mock scanner data used — excluded from policy decision and risk score');
         }
 
         // --- TRUFFLEHOG (Secrets) ---
@@ -103,7 +106,7 @@ const worker = new Worker<ScanJobData>(
         await completeScan(truffleScan.id, { findingCount: parsedSecrets.length });
 
         // --- 5. POLICY ENGINE (Guardrails) ---
-        console.log(`⚖️ [POLICY] Evaluating results...`);
+        log.debug('Evaluating policy');
         const policy = evaluatePolicy(parsedVulns, parsedSecrets);
         await recordPolicyViolations(deployment_id, service_id, policy.violations);
         const finalStatus = policy.passed ? 'success' : 'failed';
@@ -127,9 +130,9 @@ const worker = new Worker<ScanJobData>(
         });
 
         if (policy.passed) {
-          console.log(`✅ [POLICY PASS] Deployment successful for ${service_name}`);
+          log.info({ riskScore: Number(riskScore.score), cves: parsedVulns.length }, 'Policy passed');
         } else {
-          console.warn(`🛑 [POLICY FAIL] ${policy.reason}`);
+          log.warn({ riskScore: Number(riskScore.score), violations: policy.violations.map((v) => v.violationType) }, policy.reason);
         }
 
         // 9. Send ONE Slack alert per scan
@@ -177,7 +180,7 @@ const worker = new Worker<ScanJobData>(
             }
           });
         } catch (slackErr) {
-          console.error('Failed to send error alert to Slack:', slackErr);
+          log.error({ err: slackErr }, 'Failed to send scanner error alert to Slack');
         }
       }
 
@@ -193,17 +196,17 @@ const worker = new Worker<ScanJobData>(
 );
 
 worker.on('completed', (job) => {
-  console.log(`✅ Job ${job.id} completed`);
+  logger.info({ jobId: job.id }, 'Scan job completed');
 });
 
 worker.on('failed', (job, err) => {
-  console.error(`❌ Job ${job?.id} failed:`, err.message);
+  logger.error({ jobId: job?.id, err, attempt: job?.attemptsMade }, 'Scan job failed');
 });
 
 worker.on('error', (err) => {
-  console.error('Worker error:', err);
+  logger.error({ err }, 'Scan worker error');
 });
 
-console.log(`🔧 Scan worker started (concurrency: ${SCAN_CONCURRENCY})`);
+logger.info({ concurrency: SCAN_CONCURRENCY }, 'Scan worker started');
 
 export default worker;

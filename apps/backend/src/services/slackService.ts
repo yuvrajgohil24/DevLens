@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logger } from '../utils/logger';
 
 interface SlackAlertData {
   serviceName: string;
@@ -26,7 +27,7 @@ export async function sendSlackAlert(data: SlackAlertData | GenericSlackAlert) {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 
   if (!webhookUrl) {
-    console.warn('⚠️ SLACK_WEBHOOK_URL is not set. Skipping Slack notification.');
+    logger.debug('SLACK_WEBHOOK_URL not set — skipping Slack notification');
     return;
   }
 
@@ -78,8 +79,8 @@ export async function sendSlackAlert(data: SlackAlertData | GenericSlackAlert) {
 
   try {
     await axios.post(webhookUrl, payload);
-    console.log(`✅ Slack alert sent successfully for deployment: ${'serviceName' in data ? data.serviceName : data.title}`);
+    logger.info({ alert: 'serviceName' in data ? data.serviceName : data.title }, 'Slack alert sent');
   } catch (err: any) {
-    console.error('❌ Failed to send Slack alert:', err.response?.data || err.message);
+    logger.error({ status: err.response?.status, err: err.message }, 'Failed to send Slack alert');
   }
 }

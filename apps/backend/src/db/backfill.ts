@@ -1,5 +1,6 @@
 import prisma from './prisma';
 import { SEVERITY_RANK } from '../utils/severity';
+import { logger } from '../utils/logger';
 
 /**
  * Fills severityRank for rows created before the column existed. Idempotent and
@@ -14,5 +15,5 @@ export async function backfillSeverityRanks(): Promise<void> {
     });
     updated += result.count;
   }
-  if (updated > 0) console.log(`✅ Backfilled severity rank for ${updated} vulnerabilities`);
+  if (updated > 0) logger.info({ updated }, 'Backfilled vulnerability severity ranks');
 }

@@ -1,47 +1,52 @@
 import { Request, Response } from 'express';
 import { getAllServices, getServiceById } from '../services/serviceService';
 import prisma from '../db/prisma';
+import { sendError } from '../utils/httpErrors';
+import { parseIdParam } from '../utils/query';
+import { latestRiskScoreByService } from '../services/riskScoreQueries';
 
 export async function listServices(_req: Request, res: Response) {
   try {
-    const services = await getAllServices();
+    // 3 queries in total, however many services there are (was 1 + 2 per service)
+    const [services, latestRisk, openCveGroups] = await Promise.all([
+      getAllServices(),
+      latestRiskScoreByService(),
+      prisma.vulnerability.groupBy({
+        by: ['serviceId'],
+        where: { isResolved: false },
+        _count: { id: true },
+      }),
+    ]);
+    const openCves = new Map(openCveGroups.map((g) => [g.serviceId, g._count.id]));
 
-    // Attach latest risk score + open CVE count to each service
-    const enriched = await Promise.all(
-      services.map(async (svc) => {
-        const latestRisk = await prisma.riskScore.findFirst({
-          where: { serviceId: svc.id },
-          orderBy: { calculatedAt: 'desc' },
-        });
-        const openCVEs = await prisma.vulnerability.count({
-          where: { serviceId: svc.id, isResolved: false },
-        });
-        return { ...svc, latestRiskScore: latestRisk?.score ?? 0, openCVEs };
-      })
-    );
+    const enriched = services.map((svc) => ({
+      ...svc,
+      latestRiskScore: latestRisk.get(svc.id) ?? 0,
+      openCVEs: openCves.get(svc.id) ?? 0,
+    }));
 
     return res.json({ data: enriched });
   } catch (err) {
-    console.error('List services error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, err, 'List services error');
   }
 }
 
 export async function getService(req: Request, res: Response) {
+  const id = parseIdParam(req, res);
+  if (!id) return;
   try {
-    const { id } = req.params;
     const service = await getServiceById(id);
     if (!service) return res.status(404).json({ error: 'Service not found' });
     return res.json(service);
   } catch (err) {
-    console.error('Get service error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, err, 'Get service error');
   }
 }
 
 export async function getServiceRiskHistory(req: Request, res: Response) {
+  const id = parseIdParam(req, res);
+  if (!id) return;
   try {
-    const { id } = req.params;
     const history = await prisma.riskScore.findMany({
       where: { serviceId: id },
       orderBy: { calculatedAt: 'asc' },
@@ -52,7 +57,6 @@ export async function getServiceRiskHistory(req: Request, res: Response) {
     });
     return res.json({ data: history });
   } catch (err) {
-    console.error('Risk history error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, err, 'Risk history error');
   }
 }

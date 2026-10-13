@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { clerkClient } from '@clerk/express';
+import { logger } from '../utils/logger';
 
 const DEMO_USER_ID = process.env.DEMO_USER_ID;
 
@@ -27,7 +28,7 @@ export async function createDemoSession(_req: Request, res: Response) {
     });
     return res.json({ token: signInToken.token });
   } catch (err) {
-    console.error('❌ Failed to create demo sign-in token:', err);
+    logger.error({ err }, 'Failed to create demo sign-in token');
     return res.status(502).json({
       error: 'Demo unavailable',
       message: 'Could not create a demo session. Check CLERK_SECRET_KEY and DEMO_USER_ID.',

@@ -1,7 +1,9 @@
-import { Server as SocketIOServer } from 'socket.io';
+import { Server as SocketIOServer, Socket } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import IORedis from 'ioredis';
+import { verifyToken } from '@clerk/backend';
 import { createRedisConnection } from '../db/redis';
+import { logger } from '../utils/logger';
 
 let _io: SocketIOServer | null = null;
 
@@ -11,6 +13,27 @@ let _io: SocketIOServer | null = null;
  */
 const EVENTS_CHANNEL = 'devlens:ws-events';
 let publisher: IORedis | null = null;
+
+/**
+ * Socket.io handshake middleware: the client sends its Clerk session token as
+ * `auth: { token }`; it is verified the same way as API requests.
+ */
+export async function authenticateSocket(socket: Socket, next: (err?: Error) => void) {
+  const token = socket.handshake.auth?.token;
+  if (typeof token !== 'string' || !token) return next(new Error('Unauthorized'));
+  try {
+    const claims = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+      // Reject tokens minted for other origins (azp claim)
+      ...(process.env.FRONTEND_URL && { authorizedParties: [process.env.FRONTEND_URL] }),
+    });
+    if (!claims.sub) return next(new Error('Unauthorized'));
+    socket.data.userId = claims.sub;
+    next();
+  } catch {
+    next(new Error('Unauthorized'));
+  }
+}
 
 export function initializeWebSocket(httpServer: HTTPServer): SocketIOServer {
   _io = new SocketIOServer(httpServer, {
@@ -22,31 +45,34 @@ export function initializeWebSocket(httpServer: HTTPServer): SocketIOServer {
     transports: ['websocket', 'polling'],
   });
 
+  // Only signed-in users may connect (see authenticateSocket)
+  _io.use(authenticateSocket);
+
   _io.on('connection', (socket) => {
-    console.log(`🔌 WS client connected: ${socket.id}`);
+    logger.debug({ socketId: socket.id, userId: socket.data.userId }, 'WS client connected');
 
     socket.on('subscribe:service', (serviceId: string) => {
       socket.join(`service:${serviceId}`);
     });
 
     socket.on('disconnect', (reason) => {
-      console.log(`🔌 WS client disconnected: ${socket.id} (${reason})`);
+      logger.debug({ socketId: socket.id, reason }, 'WS client disconnected');
     });
   });
 
   // Relay events published by standalone worker processes
   const subscriber = createRedisConnection();
-  subscriber.subscribe(EVENTS_CHANNEL).catch((err) => console.error('❌ WS relay subscribe failed:', err.message));
+  subscriber.subscribe(EVENTS_CHANNEL).catch((err) => logger.error({ err }, 'WS relay subscribe failed'));
   subscriber.on('message', (_channel, raw) => {
     try {
       const { event, data } = JSON.parse(raw);
       _io?.emit(event, data);
     } catch (err) {
-      console.error('⚠️ Ignoring malformed WS relay message:', (err as Error).message);
+      logger.warn({ err }, 'Ignoring malformed WS relay message');
     }
   });
 
-  console.log('✅ WebSocket server initialized');
+  logger.info('WebSocket server initialized');
   return _io;
 }
 
@@ -63,7 +89,7 @@ function emit(event: string, data: unknown) {
   }
   publisher ??= createRedisConnection();
   publisher.publish(EVENTS_CHANNEL, JSON.stringify({ event, data })).catch((err) => {
-    console.error(`⚠️ Failed to relay WS event ${event}:`, err.message);
+    logger.error({ event, err }, 'Failed to relay WS event');
   });
 }
 

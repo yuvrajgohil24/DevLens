@@ -1,12 +1,15 @@
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import crypto from 'crypto';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 import { SCANNER_TIMEOUT_MS } from './mock';
+import { COMMIT_SHA_REGEX } from '../utils/validation';
 import { pathToFileURL } from 'url';
+import { logger } from '../utils/logger';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface NormalizedSecret {
   type: string;
@@ -55,6 +58,34 @@ export function resolveTruffleHogBin(): string {
 }
 
 /**
+ * Optional history cut-off for secret scanning: TRUFFLEHOG_SINCE_COMMIT=<sha>.
+ *
+ * Commits up to and including that one are skipped (e.g. a repo whose old
+ * history contains known, already-rotated test secrets), every later commit is
+ * still scanned. The flag is only used for repos that actually contain the
+ * commit — other repos (or shallow clones without it) get a full scan, because
+ * TruffleHog would fail on an unknown commit. Returns the full SHA, or undefined.
+ */
+export async function resolveSinceCommit(repoPath: string): Promise<string | undefined> {
+  const configured = process.env.TRUFFLEHOG_SINCE_COMMIT?.trim();
+  if (!configured) return undefined;
+
+  if (!COMMIT_SHA_REGEX.test(configured)) {
+    logger.warn({ scanner: 'trufflehog', value: configured }, 'Ignoring invalid TRUFFLEHOG_SINCE_COMMIT (expected a commit SHA)');
+    return undefined;
+  }
+  if (/^(https?:\/\/|git@)/.test(repoPath)) return undefined; // can't check a remote; scan everything
+
+  try {
+    const { stdout } = await execFileAsync('git', ['rev-parse', '--verify', '--quiet', `${configured}^{commit}`], { cwd: repoPath });
+    return stdout.trim();
+  } catch {
+    logger.info({ scanner: 'trufflehog', sinceCommit: configured }, 'TRUFFLEHOG_SINCE_COMMIT not in this repository — scanning full history');
+    return undefined;
+  }
+}
+
+/**
  * Runs TruffleHog scanner on the provided git repository path.
  */
 export async function runTruffleHog(repoPath: string): Promise<string> {
@@ -82,9 +113,13 @@ export async function runTruffleHog(repoPath: string): Promise<string> {
     }
   }
 
+  // sinceCommit is a verified full hex SHA (see resolveSinceCommit), safe to interpolate
+  const sinceCommit = await resolveSinceCommit(repoPath);
+  const sinceFlag = sinceCommit ? ` --since-commit ${sinceCommit}` : '';
+
   // Added --no-verification so it doesn't filter out our fake test secrets
-  const command = `"${truffleHogBin}" git "${gitUri}" --json --no-update --no-verification`;
-  console.log(`🔍 [TRUFFLEHOG] Scanning git history at URI: ${gitUri}`);
+  const command = `"${truffleHogBin}" git "${gitUri}" --json --no-update --no-verification${sinceFlag}`;
+  logger.info({ scanner: 'trufflehog', uri: gitUri, sinceCommit: sinceCommit ?? null }, 'Scanning git history for secrets');
 
   try {
     const { stdout } = await execAsync(command, {
@@ -101,12 +136,12 @@ export async function runTruffleHog(repoPath: string): Promise<string> {
       throw new Error(`TruffleHog scan timed out after ${SCANNER_TIMEOUT_MS}ms`);
     }
     if (err.stdout) {
-      console.log(`✅ [TRUFFLEHOG] Scan complete (secrets found in output)`);
+      logger.info({ scanner: 'trufflehog' }, 'TruffleHog scan complete (secrets found)');
       return err.stdout;
     }
     // Real error — binary missing, permissions, etc. Fail the scan instead of
     // returning '' so a broken scanner is never reported as "0 secrets found".
-    console.error(`❌ [TRUFFLEHOG] Critical error:`, err.stderr || err.message);
+    logger.error({ scanner: 'trufflehog', stderr: String(err.stderr || err.message).slice(0, 500) }, 'TruffleHog failed');
     throw new Error(`TruffleHog scan failed (binary: ${truffleHogBin}): ${String(err.stderr || err.message).slice(0, 500)}`);
   }
 }
@@ -136,7 +171,7 @@ export function parseTruffleHogOutput(rawOutput: string): NormalizedSecret[] {
       });
     } catch (e) {
       // Don't log the line itself — it may contain a plaintext secret
-      console.warn(`⚠️ [TRUFFLEHOG] Failed to parse an output line (${line.length} chars)`);
+      logger.warn({ scanner: 'trufflehog', length: line.length }, 'Skipping unparseable TruffleHog output line');
     }
   }
 

@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
 import { BRANCH_REGEX, COMMIT_SHA_REGEX, isAllowedRepoUrl } from './validation';
+import { logger } from './logger';
 
 const execFileAsync = promisify(execFile);
 
@@ -48,7 +49,7 @@ export async function cloneRepository(repoUrl: string, targetPath: string, branc
     throw new Error(`Refusing to checkout invalid commit SHA: ${commitSha}`);
   }
 
-  console.log(`📡 [GIT] Cloning ${repoUrl} to ${targetPath}`);
+  logger.info({ repoUrl, targetPath, branch, commitSha }, 'Cloning repository');
 
   try {
     // Ensure parent directory exists
@@ -67,9 +68,9 @@ export async function cloneRepository(repoUrl: string, targetPath: string, branc
       await runGit(['clone', '--quiet', '--depth', '1', '--', repoUrl, targetPath]);
     }
 
-    console.log(`✅ [GIT] Clone successful${branch ? ` (branch: ${branch})` : ''}${commitSha ? ` (commit: ${commitSha})` : ''}`);
+    logger.info({ repoUrl }, 'Clone complete');
   } catch (err: any) {
-    console.error(`❌ [GIT] Clone failed:`, redactToken(String(err?.stderr || err?.message || err)));
+    logger.error({ repoUrl, reason: redactToken(String(err?.stderr || err?.message || err)) }, 'Clone failed');
     throw new Error(`Failed to clone repository: ${repoUrl}`);
   }
 }
@@ -77,8 +78,8 @@ export async function cloneRepository(repoUrl: string, targetPath: string, branc
 export async function cleanupDirectory(dirPath: string): Promise<void> {
   try {
     await fs.rm(dirPath, { recursive: true, force: true });
-    console.log(`🧹 [GIT] Cleaned up ${dirPath}`);
+    logger.debug({ dirPath }, 'Cleaned up scan directory');
   } catch (err) {
-    console.error(`⚠️ [GIT] Cleanup failed for ${dirPath}:`, err);
+    logger.warn({ dirPath, err }, 'Scan directory cleanup failed');
   }
 }

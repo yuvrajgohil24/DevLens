@@ -1,54 +1,63 @@
 import { Request, Response } from 'express';
 import prisma from '../db/prisma';
 import { BY_SEVERITY } from '../utils/severity';
+import { sendError } from '../utils/httpErrors';
+import { z } from 'zod';
+import { booleanParam, idParam, limitParam, offsetParam, parseIdParam, parseQuery, scannerParam, severityParam } from '../utils/query';
+
+const ListVulnerabilitiesQuery = z.object({
+  severity: severityParam.optional(),
+  service: idParam.optional(),
+  scanner: scannerParam.optional(),
+  resolved: booleanParam,
+  limit: limitParam(100),
+  offset: offsetParam,
+});
 
 export async function listVulnerabilities(req: Request, res: Response) {
+  const query = parseQuery(ListVulnerabilitiesQuery, req, res);
+  if (!query) return;
+  const { severity, service, scanner, resolved, limit, offset } = query;
+
   try {
-    const { severity, service, scanner, resolved, limit, offset } = req.query;
+    const where = {
+      ...(severity && { severity }),
+      ...(service && { serviceId: service }),
+      ...(scanner && { scannerSource: scanner }),
+      ...(resolved !== undefined && { isResolved: resolved }),
+    };
 
-    const vulnerabilities = await prisma.vulnerability.findMany({
-      where: {
-        ...(severity && { severity: severity as string }),
-        ...(service && { serviceId: service as string }),
-        ...(scanner && { scannerSource: scanner as string }),
-        ...(resolved !== undefined && { isResolved: resolved === 'true' }),
-      },
-      include: {
-        service: { select: { id: true, name: true } },
-        deployment: { select: { id: true, commitSha: true, branch: true, environment: true } },
-        scan: { select: { isMock: true } },
-      },
-      orderBy: [BY_SEVERITY, { cvssScore: 'desc' }, { detectedAt: 'desc' }],
-      take: limit ? parseInt(limit as string, 10) : 100,
-      skip: offset ? parseInt(offset as string, 10) : 0,
-    });
-
-    const total = await prisma.vulnerability.count({
-      where: {
-        ...(severity && { severity: severity as string }),
-        ...(service && { serviceId: service as string }),
-        ...(scanner && { scannerSource: scanner as string }),
-        ...(resolved !== undefined && { isResolved: resolved === 'true' }),
-      },
-    });
+    const [vulnerabilities, total] = await Promise.all([
+      prisma.vulnerability.findMany({
+        where,
+        include: {
+          service: { select: { id: true, name: true } },
+          deployment: { select: { id: true, commitSha: true, branch: true, environment: true } },
+          scan: { select: { isMock: true } },
+        },
+        orderBy: [BY_SEVERITY, { cvssScore: 'desc' }, { detectedAt: 'desc' }],
+        take: limit,
+        skip: offset,
+      }),
+      prisma.vulnerability.count({ where }),
+    ]);
 
     return res.json({ data: vulnerabilities, total });
   } catch (err) {
-    console.error('List vulnerabilities error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, err, 'List vulnerabilities error');
   }
 }
 
 export async function resolveVulnerability(req: Request, res: Response) {
+  const id = parseIdParam(req, res);
+  if (!id) return;
   try {
-    const { id } = req.params;
     const vuln = await prisma.vulnerability.update({
       where: { id },
       data: { isResolved: true, resolvedAt: new Date() },
     });
     return res.json(vuln);
   } catch (err) {
-    console.error('Resolve vulnerability error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, err, 'Resolve vulnerability error');
   }
 }

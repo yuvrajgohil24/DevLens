@@ -10,6 +10,8 @@ import {
 import { scanQueue } from '../db/redis';
 import { wsEvents } from '../websocket/index';
 import { branchSchema, commitShaSchema, repoUrlSchema } from '../utils/validation';
+import { sendError } from '../utils/httpErrors';
+import { reqLogger } from '../utils/logger';
 
 export const PipelinePayloadSchema = z.object({
   commit_sha: commitShaSchema,
@@ -47,7 +49,7 @@ export async function handlePipelineWebhook(req: Request, res: Response) {
 
     // 2. Upsert service
     const service = await getOrCreateService(service_name, repo_url, language);
-    console.log(`📦 Service: ${service.name} (${service.id.slice(0, 8)})`);
+
 
     // 3. CI sends several events per run (running → success/failed). Later events
     //    update the existing deployment instead of creating (and scanning) a duplicate.
@@ -58,7 +60,7 @@ export async function handlePipelineWebhook(req: Request, res: Response) {
         { ciStatus: status },
         { pipelineUrl: pipeline_url, commitMessage: commit_message }
       );
-      console.log(`🔁 CI status '${status}' recorded for deployment ${existing.id.slice(0, 8)} → ${updated.status}`);
+      reqLogger(req).info({ deploymentId: existing.id, ciStatus: status, status: updated.status }, 'CI status recorded');
       try {
         wsEvents.deploymentUpdated({ deploymentId: updated.id, status: updated.status });
       } catch {
@@ -86,7 +88,7 @@ export async function handlePipelineWebhook(req: Request, res: Response) {
       environment,
       pipelineUrl: pipeline_url,
     });
-    console.log(`🚀 Deployment created: ${deployment.id.slice(0, 8)} [${environment}]`);
+    reqLogger(req).info({ deploymentId: deployment.id, service: service.name, environment, commitSha: commit_sha }, 'Deployment created');
 
     // Later CI events may omit repo_url — fall back to the URL stored on the service
     const scanRepoUrl = repo_url ?? service.repoUrl ?? undefined;
@@ -106,7 +108,7 @@ export async function handlePipelineWebhook(req: Request, res: Response) {
       },
       { jobId: deployment.id } // BullMQ ignores a second job with the same id
     );
-    console.log(`📋 Scan enqueued for deployment ${deployment.id.slice(0, 8)}`);
+    reqLogger(req).info({ deploymentId: deployment.id }, 'Scan enqueued');
 
     // 5. Notify frontend via WebSocket
     try {
@@ -126,7 +128,6 @@ export async function handlePipelineWebhook(req: Request, res: Response) {
       message: `Deployment recorded and scan enqueued for ${service_name}`,
     });
   } catch (err) {
-    console.error('Webhook handler error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, err, 'Webhook handler error');
   }
 }

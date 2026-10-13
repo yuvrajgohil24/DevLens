@@ -2,8 +2,9 @@
 
 import { useWebSocket } from '@/components/providers/WebSocketProvider';
 import { usePathname } from 'next/navigation';
-import { Wifi, WifiOff } from 'lucide-react';
+import { Wifi, WifiOff, ShieldCheck } from 'lucide-react';
 import { UserButton } from '@clerk/nextjs';
+import { usePermissions } from '@/lib/permissions';
 
 const TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -16,6 +17,7 @@ const TITLES: Record<string, string> = {
 
 export function Header() {
   const { isConnected, lastDeployment, lastScan } = useWebSocket();
+  const { role } = usePermissions();
   const pathname = usePathname();
 
   const title = Object.entries(TITLES).find(([k]) => pathname === k || pathname.startsWith(k + '/'))?.[1] ?? 'DevLens';
@@ -68,6 +70,23 @@ export function Header() {
             ? <><Wifi size={12} /> Live</>
             : <><WifiOff size={12} /> Offline</>}
         </div>
+
+        {/* Role badge — shown only to admins (role comes from the backend's /api/me) */}
+        {role === 'admin' && (
+          <div
+            title="You are signed in as an admin — write actions are enabled"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+              color: 'var(--primary)',
+              background: 'var(--primary-glow)',
+              padding: '4px 10px', borderRadius: 999,
+              border: '1px solid rgba(129,140,248,0.35)',
+            }}
+          >
+            <ShieldCheck size={12} /> Admin
+          </div>
+        )}
 
         {/* Account / sign out */}
         <UserButton />
